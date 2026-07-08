@@ -1,6 +1,7 @@
 // Thin API client with JWT handling.
 const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/+$/, "");
 
+export { BASE };
 export function getToken() { return localStorage.getItem("jms_token"); }
 export function setToken(t) { t ? localStorage.setItem("jms_token", t) : localStorage.removeItem("jms_token"); }
 
@@ -43,6 +44,22 @@ export const api = {
   emailReport: (id, week) => request(`/projects/${id}/report/email/`, { method: "POST", body: { week } }),
   summary: (id) => request(`/projects/${id}/summary/`),
   gantt: (id) => request(`/projects/${id}/gantt/`),
+  ganttPdf: async (id, projectName = "project") => {
+    const token = getToken();
+    const res = await fetch(`${BASE}/projects/${id}/gantt-pdf/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error("Failed to generate PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${projectName.toLowerCase().replace(/\s+/g, "_")}_gantt_chart.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
   updates: (id) => request(`/projects/${id}/updates/`),
   postUpdate: (id, text) => request(`/projects/${id}/updates/`, { method: "POST", body: { text } }),
 
