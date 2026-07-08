@@ -1,5 +1,5 @@
 // Thin API client with JWT handling.
-const BASE = "/api";
+const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/+$/, "");
 
 export function getToken() { return localStorage.getItem("jms_token"); }
 export function setToken(t) { t ? localStorage.setItem("jms_token", t) : localStorage.removeItem("jms_token"); }
