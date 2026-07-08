@@ -678,90 +678,56 @@ function TaskTable({ tasks, filterDev, onToggle, reassignOptions, onReassign }) 
 }
 
 /* ---------- Gantt ---------- */
-function GanttView({ projectId, project }) {
+function GanttView({ projectId }) {
   const [data, setData] = useState(null);
-  const [exporting, setExporting] = useState(false);
-
   useEffect(() => { api.gantt(projectId).then(setData); }, [projectId]);
-
-  const exportToPDF = async () => {
-    setExporting(true);
-    try {
-      await api.ganttPdf(projectId, project.name);
-      console.log("✓ Backend Gantt PDF downloaded");
-    } catch (err) {
-      console.error("PDF export error:", err);
-      alert("Could not generate PDF. Please try again or check server logs.");
-    } finally {
-      setExporting(false);
-    }
-  };
-
   if (!data) return <Spinner text="Building Gantt…" />;
 
   const { n_days, rows } = data;
-  const modules = [...new Set(rows.flatMap(r => (r.segments || []).map(s => s.module).filter(Boolean)))];
+  const modules = [...new Set(rows.flatMap(r => r.segments.map(s => s.module)))];
   const color = {}; modules.forEach((m, i) => { color[m] = MODULE_COLORS[i % MODULE_COLORS.length]; });
   const nWeeks = Math.ceil(n_days / 5);
 
   return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
-        <div>
-          <h3 className="f-disp font-bold text-lg">Gantt Chart</h3>
-          <p className="text-xs text-gray-500">Visual project timeline by developer and module • PDF uses professional backend template</p>
-        </div>
-        <Btn kind="outline" small onClick={exportToPDF} disabled={exporting}>
-          <Download size={13} /> {exporting ? "Generating…" : "Export PDF (backend)"}
-        </Btn>
-      </div>
-
-      <div className="overflow-x-auto bg-white p-2 border border-gray-100 rounded">
-        <div style={{ minWidth: Math.max(700, n_days * 26 + 130), width: "fit-content" }} className="bg-white">
-          <div className="flex mb-1">
-            <div className="w-28 shrink-0" />
-            <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${nWeeks}, 1fr)` }}>
-              {Array.from({ length: nWeeks }, (_, i) => (
-                <div key={i} className="text-center border-l border-gray-200 f-disp font-bold text-xs">W{i + 1}</div>
-              ))}
-            </div>
-          </div>
-          {rows.map(r => (
-            <div key={r.developer} className="flex items-center h-11 border-t border-gray-100">
-              <div className="w-28 shrink-0 pr-2">
-                <div className="f-disp font-semibold text-xs truncate">{r.developer}</div>
-                <div className="text-[10px] text-gray-400 truncate">{r.designation}</div>
-              </div>
-              <div className="flex-1 relative h-6 bg-gray-50 rounded">
-                {r.segments.map((s, i) => {
-                  if (!s.module) return null;
-                  const donePct = Math.round((s.done || 0) / s.len * 100);
-                  return (
-                    <div key={i} title={`${s.module} · D${s.start}–D${s.start + s.len - 1} · ${s.done || 0}/${s.len} done`}
-                      className="absolute top-0 h-6 rounded flex items-center overflow-hidden border"
-                      style={{ 
-                        left: `${(s.start - 1) / n_days * 100}%`, 
-                        width: `${s.len / n_days * 100}%`, 
-                        background: color[s.module] + "33", 
-                        borderColor: color[s.module] 
-                      }}>
-                      <div className="absolute inset-y-0 left-0 rounded-l" style={{ width: `${donePct}%`, background: color[s.module] }} />
-                      <span className="relative f-disp text-[9px] font-bold px-1.5 truncate" style={{ color: color[s.module] }}>{s.module}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-          <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-gray-100">
-            {modules.map(m => (
-              <span key={m} className="inline-flex items-center gap-1.5 text-[11px] text-gray-600">
-                <span className="w-3 h-3 rounded-sm" style={{ background: color[m] + "AA", border: `1px solid ${color[m]}` }} /> {m}
-              </span>
+    <Card className="p-4 overflow-x-auto">
+      <div style={{ minWidth: Math.max(700, n_days * 26 + 130) }}>
+        <div className="flex mb-1">
+          <div className="w-28 shrink-0" />
+          <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${nWeeks}, 1fr)` }}>
+            {Array.from({ length: nWeeks }, (_, i) => (
+              <div key={i} className="text-center border-l border-gray-200 f-disp font-bold text-xs">W{i + 1}</div>
             ))}
           </div>
-          <p className="text-[11px] text-gray-400 mt-2">The backend PDF includes branding, legend, metadata, week grid and progress bars.</p>
         </div>
+        {rows.map(r => (
+          <div key={r.developer} className="flex items-center h-11 border-t border-gray-100">
+            <div className="w-28 shrink-0 pr-2">
+              <div className="f-disp font-semibold text-xs truncate">{r.developer}</div>
+              <div className="text-[10px] text-gray-400 truncate">{r.designation}</div>
+            </div>
+            <div className="flex-1 relative h-6 bg-gray-50 rounded">
+              {r.segments.map((s, i) => {
+                const donePct = Math.round(s.done / s.len * 100);
+                return (
+                  <div key={i} title={`${s.module} · D${s.start}–D${s.start + s.len - 1} · ${s.done}/${s.len} done`}
+                    className="absolute top-0 h-6 rounded flex items-center overflow-hidden"
+                    style={{ left: `${(s.start - 1) / n_days * 100}%`, width: `${s.len / n_days * 100}%`, background: color[s.module] + "33", border: `1px solid ${color[s.module]}` }}>
+                    <div className="absolute inset-y-0 left-0" style={{ width: `${donePct}%`, background: color[s.module] + "AA" }} />
+                    <span className="relative f-disp text-[9px] font-bold px-1 truncate" style={{ color: color[s.module] }}>{s.module}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-gray-100">
+          {modules.map(m => (
+            <span key={m} className="inline-flex items-center gap-1.5 text-[11px] text-gray-600">
+              <span className="w-3 h-3 rounded-sm" style={{ background: color[m] }} /> {m}
+            </span>
+          ))}
+        </div>
+        <p className="text-[11px] text-gray-400 mt-2">Solid fill inside a bar = portion of that workstream already completed.</p>
       </div>
     </Card>
   );
