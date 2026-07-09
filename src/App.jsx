@@ -678,9 +678,44 @@ function TaskTable({ tasks, filterDev, onToggle, reassignOptions, onReassign }) 
 }
 
 /* ---------- Gantt ---------- */
-function GanttView({ projectId }) {
+/* ---------- Gantt ---------- */
+function GanttView({ projectId, project }) {
   const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const chartRef = useRef(null);
+
   useEffect(() => { api.gantt(projectId).then(setData); }, [projectId]);
+
+  // Fallback: rasterize the on-screen chart when the server-side PDF fails
+  // (e.g. WeasyPrint/GTK missing on the box, or a transient network error).
+  const exportViaBrowser = async () => {
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import("html2canvas"),
+      import("jspdf"),
+    ]);
+    const node = chartRef.current;
+    const canvas = await html2canvas(node, { backgroundColor: "#ffffff", scale: 2 });
+    const img = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [canvas.width, canvas.height] });
+    pdf.addImage(img, "PNG", 0, 0, canvas.width, canvas.height);
+    pdf.save(`${(project?.name || "project").toLowerCase().replace(/\s+/g, "_")}_gantt_chart.pdf`);
+  };
+
+  const download = async () => {
+    setErr(""); setBusy(true);
+    try {
+      await api.ganttPdf(projectId, project?.name || "project");
+    } catch (serverErr) {
+      try {
+        await exportViaBrowser();
+      } catch {
+        setErr(serverErr.message || "Couldn't generate the PDF.");
+      }
+    }
+    setBusy(false);
+  };
+
   if (!data) return <Spinner text="Building Gantt…" />;
 
   const { n_days, rows } = data;
@@ -690,7 +725,16 @@ function GanttView({ projectId }) {
 
   return (
     <Card className="p-4 overflow-x-auto">
-      <div style={{ minWidth: Math.max(700, n_days * 26 + 130) }}>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <p className="text-[11px] text-gray-400">Solid fill inside a bar = portion of that workstream already completed.</p>
+        <Btn kind="outline" small onClick={download} disabled={busy}>
+          {busy ? <Loader2 className="animate-spin" size={13} /> : <Download size={13} />}
+          {busy ? "Preparing…" : "Download PDF"}
+        </Btn>
+      </div>
+      {err && <p className="text-xs text-red-600 mb-3 flex items-center gap-1.5"><AlertTriangle size={13} /> {err}</p>}
+
+      <div ref={chartRef} style={{ minWidth: Math.max(700, n_days * 26 + 130) }}>
         <div className="flex mb-1">
           <div className="w-28 shrink-0" />
           <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${nWeeks}, 1fr)` }}>
@@ -727,7 +771,6 @@ function GanttView({ projectId }) {
             </span>
           ))}
         </div>
-        <p className="text-[11px] text-gray-400 mt-2">Solid fill inside a bar = portion of that workstream already completed.</p>
       </div>
     </Card>
   );
