@@ -388,7 +388,7 @@ function NewProject({ onDone }) {
     setErr("");
     if (!form.name.trim()) return setErr("Give the project a name.");
     if (!teamIds.length) return setErr("Select at least one developer.");
-    if (!docText.trim() && !pdf) return setErr("Upload the SOW/FDD PDF or paste its scope text.");
+    if (!docText.trim() && !pdf) return setErr("Upload the SOW/FDD (PDF, DOC or DOCX) or paste its scope text.");
     setPhase("generating");
     try {
       const fd = new FormData();
@@ -471,10 +471,10 @@ function NewProject({ onDone }) {
         </div>
         <div>
           <Label>SOW / FDD document</Label>
-          <input ref={fileRef} type="file" accept=".pdf" className="hidden"
+          <input ref={fileRef} type="file" accept=".pdf,.doc,.docx" className="hidden"
             onChange={e => setPdf(e.target.files?.[0] || null)} />
           <div className="flex items-center gap-2 mb-2">
-            <Btn kind="outline" onClick={() => fileRef.current?.click()}><FileText size={14} /> Upload PDF</Btn>
+            <Btn kind="outline" onClick={() => fileRef.current?.click()}><FileText size={14} /> Upload Document</Btn>
             {pdf && <span className="text-xs text-gray-600 inline-flex items-center gap-1">{pdf.name} <button onClick={() => setPdf(null)}><X size={12} className="text-gray-400 hover:text-red-500" /></button></span>}
           </div>
           <textarea value={docText} onChange={e => setDocText(e.target.value)} rows={4}
