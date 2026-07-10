@@ -202,7 +202,7 @@ function AdHocTaskRow({ t, isAdmin, onToggle, onComment, onDelete }) {
             {t.priority === 'HIGH' && <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-bold">HIGH</span>}
           </div>
           {t.description && <p className="text-xs text-gray-600 mb-2">{t.description}</p>}
-          
+
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500">
             {isAdmin ? <span>Assignee: <b>{t.assigned_to_name}</b></span> : <span>From: <b>{t.created_by_name}</b></span>}
             <span>Due: {t.due_date ? new Date(t.due_date).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
@@ -215,7 +215,7 @@ function AdHocTaskRow({ t, isAdmin, onToggle, onComment, onDelete }) {
               </div>
             )}
           </div>
-          
+
           {t.comment && !expanded && (
             <div className="text-[11px] text-gray-500 mt-2 p-2 bg-gray-50 rounded border border-gray-100 flex items-start gap-1.5">
               <MessageSquare size={12} className="shrink-0 mt-0.5 text-gray-400" />
@@ -228,7 +228,7 @@ function AdHocTaskRow({ t, isAdmin, onToggle, onComment, onDelete }) {
           {isAdmin && <button onClick={onDelete} className="text-gray-400 hover:text-red-600" title="Delete"><Trash2 size={15} /></button>}
         </div>
       </div>
-      
+
       {expanded && (
         <div className="bg-indigo-50/30 border-t border-gray-100 px-4 py-3">
           <div className="flex gap-2">
@@ -626,7 +626,7 @@ function NewProject({ onDone }) {
       fd.append("brief", JSON.stringify(draft.brief));
       fd.append("rows", JSON.stringify(draft.rows));
       if (pdf) fd.append("sow_pdf", pdf);
-      
+
       const p = await api.createProject(fd);
       onDone(p);
     } catch (e) { setErr(e.message); }
@@ -1315,7 +1315,7 @@ function DevShell({ me, signOut }) {
         </Card>
       ))}
 
-      <nav className="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto">
+      <nav className="flex gap-1 mb-4 border-b border-gray-200 overflow-auto">
         {[["today", `Today (${todayTasks.length})`], ["overdue", `Overdue (${overdue.length})`], ["upcoming", "Upcoming"], ["all", "Full plan"], ["adhoc", "My Tasks"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`f-disp text-sm font-semibold px-3 py-2 -mb-px border-b-2 whitespace-nowrap ${tab === id ? "" : "border-transparent text-gray-500"}`}
