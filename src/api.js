@@ -25,6 +25,10 @@ export const api = {
   me: () => request("/auth/me/"),
 
   users: () => request("/auth/users/"),
+  team: async () => {
+    const users = await request("/auth/users/");
+    return users.filter(u => u.role === "DEVELOPER");
+  },
   addUser: (u) => request("/auth/users/", { method: "POST", body: u }),
   delUser: (id) => request(`/auth/users/${id}/`, { method: "DELETE" }),
 
@@ -37,7 +41,7 @@ export const api = {
   projects: () => request("/projects/"),
   project: (id) => request(`/projects/${id}/`),
   generatePlan: (formData) => request("/projects/generate-plan/", { method: "POST", body: formData, form: true }),
-  createProject: (payload) => request("/projects/", { method: "POST", body: payload }),
+  createProject: (formData) => request("/projects/", { method: "POST", body: formData, form: true }),
   deleteProject: (id) => request(`/projects/${id}/`, { method: "DELETE" }),
   adjust: (id, formData) => request(`/projects/${id}/adjust/`, { method: "POST", body: formData, form: true }),
   report: (id, week) => request(`/projects/${id}/report/?week=${week}`),
@@ -73,4 +77,52 @@ export const api = {
 
   tasks: (params = "") => request(`/tasks/${params}`),
   patchTask: (id, body) => request(`/tasks/${id}/`, { method: "PATCH", body }),
+
+  docs: (projectId) => request(`/projects/${projectId}/documents/`),
+  uploadDoc: (projectId, formData) =>
+    request(`/projects/${projectId}/documents/`, { method: "POST", body: formData, form: true }),
+  deleteDoc: (projectId, docId) =>
+    request(`/projects/${projectId}/documents/${docId}/`, { method: "DELETE" }),
+
+  // Report PDFs
+  reportPdf: async (id, week, projectName = "project") => {
+    const token = getToken();
+    const res = await fetch(`${BASE}/projects/${id}/report-pdf/?week=${week}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`PDF generation failed (${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${projectName.toLowerCase().replace(/\s+/g, "_")}_W${week}_report.pdf`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+  dailyReport: (id, date) => request(`/projects/${id}/daily-report/?date=${date}`),
+  dailyReportPdf: async (id, date, projectName = "project") => {
+    const token = getToken();
+    const res = await fetch(`${BASE}/projects/${id}/daily-report-pdf/?date=${date}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`PDF generation failed (${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${projectName.toLowerCase().replace(/\s+/g, "_")}_${date}_daily_report.pdf`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  // Ad-hoc tasks
+  adhocTasks: (params = "") => request(`/adhoc-tasks/${params}`),
+  createAdhocTask: (formData) => request(`/adhoc-tasks/`, { method: "POST", body: formData, form: true }),
+  patchAdhocTask: (id, body) => request(`/adhoc-tasks/${id}/`, { method: "PATCH", body }),
+  deleteAdhocTask: (id) => request(`/adhoc-tasks/${id}/`, { method: "DELETE" }),
+  adhocAttachments: (taskId) => request(`/adhoc-tasks/${taskId}/attachments/`),
+  uploadAdhocAttachment: (taskId, formData) =>
+    request(`/adhoc-tasks/${taskId}/attachments/`, { method: "POST", body: formData, form: true }),
+  deleteAdhocAttachment: (taskId, attId) =>
+    request(`/adhoc-tasks/${taskId}/attachments/?attachment_id=${attId}`, { method: "DELETE" }),
 };

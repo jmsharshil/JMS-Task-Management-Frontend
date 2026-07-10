@@ -3,7 +3,7 @@ import {
   Users, Briefcase, FolderKanban, LayoutDashboard, Plus, Trash2, ChevronRight,
   CheckCircle2, Circle, FileText, Loader2, Mail, Copy, Download, ArrowLeft,
   RefreshCw, LogOut, X, AlertTriangle, Sparkles, BarChart3, Megaphone,
-  SlidersHorizontal, Bot
+  SlidersHorizontal, Bot, MessageSquare, Paperclip, UploadCloud, Eye
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -114,6 +114,203 @@ function Login({ onLogin }) {
   );
 }
 
+/* ================= AD-HOC TASKS ================= */
+function AdHocTasksTab({ me, isAdmin }) {
+  const [tasks, setTasks] = useState(null);
+  const [team, setTeam] = useState([]);
+  const [filterUser, setFilterUser] = useState("");
+  const [showModal, setShowModal] = useState(false);
+
+  const load = async () => {
+    let q = "";
+    if (isAdmin && filterUser) q = `?assignee=${filterUser}`;
+    const [t, tm] = await Promise.all([
+      api.adhocTasks(q),
+      isAdmin ? api.team() : Promise.resolve([])
+    ]);
+    setTasks(t.results || t);
+    if (isAdmin) setTeam(tm);
+  };
+  useEffect(() => { load(); }, [isAdmin, filterUser]);
+
+  const toggle = async (task) => {
+    const next = task.status === "DONE" ? "TODO" : "DONE";
+    setTasks(tasks.map(t => t.id === task.id ? { ...t, status: next } : t));
+    await api.patchAdhocTask(task.id, { status: next });
+  };
+  const saveComment = async (taskId, comment) => {
+    setTasks(tasks.map(t => t.id === taskId ? { ...t, comment } : t));
+    await api.patchAdhocTask(taskId, { comment });
+  };
+  const removeTask = async (id) => {
+    if (!confirm("Delete this task?")) return;
+    await api.deleteAdhocTask(id);
+    load();
+  };
+
+  if (!tasks) return <Spinner text="Loading tasks…" />;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="f-disp font-bold text-lg">Ad-Hoc Tasks</h2>
+        {isAdmin && (
+          <div className="flex gap-2">
+            <select value={filterUser} onChange={e => setFilterUser(e.target.value)} className="f-body text-xs border border-gray-300 rounded-md px-2 bg-white">
+              <option value="">All team members</option>
+              {team.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <Btn small onClick={() => setShowModal(true)}><Plus size={13} /> Assign Task</Btn>
+          </div>
+        )}
+      </div>
+
+      {tasks.length === 0 ? (
+        <Card className="p-8 text-center text-gray-400 text-sm">No ad-hoc tasks found.</Card>
+      ) : (
+        <div className="space-y-3">
+          {tasks.map(t => (
+            <AdHocTaskRow key={t.id} t={t} isAdmin={isAdmin} onToggle={toggle} onComment={saveComment} onDelete={() => removeTask(t.id)} />
+          ))}
+        </div>
+      )}
+
+      {showModal && <NewAdHocTaskModal team={team} onClose={() => setShowModal(false)} onSaved={() => { setShowModal(false); load(); }} />}
+    </div>
+  );
+}
+
+function AdHocTaskRow({ t, isAdmin, onToggle, onComment, onDelete }) {
+  const [expanded, setExpanded] = useState(false);
+  const [commentText, setCommentText] = useState(t.comment || "");
+
+  const handleSave = () => {
+    if (t.comment !== commentText) onComment(t.id, commentText);
+    setExpanded(false);
+  };
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 group">
+        <button onClick={() => onToggle(t)} className="mt-0.5 shrink-0">
+          {t.status === "DONE" ? <CheckCircle2 size={18} className="text-green-600" /> : <Circle size={18} className="text-gray-300 hover:text-gray-500" />}
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className={`f-disp font-semibold text-sm ${t.status === "DONE" ? "line-through text-gray-400" : ""}`}>{t.title}</span>
+            {t.priority === 'URGENT' && <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">URGENT</span>}
+            {t.priority === 'HIGH' && <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-bold">HIGH</span>}
+          </div>
+          {t.description && <p className="text-xs text-gray-600 mb-2">{t.description}</p>}
+          
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500">
+            {isAdmin ? <span>Assignee: <b>{t.assigned_to_name}</b></span> : <span>From: <b>{t.created_by_name}</b></span>}
+            <span>Due: {t.due_date ? new Date(t.due_date).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
+            {t.attachments?.length > 0 && (
+              <div className="flex items-center gap-1">
+                <Paperclip size={10} />
+                {t.attachments.map(a => (
+                  <a key={a.id} href={a.file_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">{a.title}</a>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {t.comment && !expanded && (
+            <div className="text-[11px] text-gray-500 mt-2 p-2 bg-gray-50 rounded border border-gray-100 flex items-start gap-1.5">
+              <MessageSquare size={12} className="shrink-0 mt-0.5 text-gray-400" />
+              <span className="whitespace-pre-wrap">{t.comment}</span>
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={() => { setCommentText(t.comment || ""); setExpanded(!expanded); }} className="text-gray-400 hover:text-indigo-600" title="Comment"><MessageSquare size={15} /></button>
+          {isAdmin && <button onClick={onDelete} className="text-gray-400 hover:text-red-600" title="Delete"><Trash2 size={15} /></button>}
+        </div>
+      </div>
+      
+      {expanded && (
+        <div className="bg-indigo-50/30 border-t border-gray-100 px-4 py-3">
+          <div className="flex gap-2">
+            <textarea
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              placeholder="Add a comment, status update, or blockers..."
+              className="f-body flex-1 text-sm bg-white border border-gray-300 rounded-md p-2 focus:outline-none focus:border-indigo-400"
+              rows={2}
+              autoFocus
+            />
+            <div className="flex flex-col gap-2 shrink-0 justify-end">
+              <Btn small onClick={handleSave}>Save note</Btn>
+              <Btn small kind="ghost" onClick={() => setExpanded(false)}>Cancel</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function NewAdHocTaskModal({ team, onClose, onSaved }) {
+  const nowLocal = () => { const d = new Date(); d.setHours(18, 0, 0, 0); return d.toISOString().slice(0, 16); };
+  const [form, setForm] = useState({ title: "", description: "", assigned_to: team[0]?.id || "", priority: "MEDIUM", due_date: nowLocal() });
+  const [files, setFiles] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const fileRef = useRef(null);
+
+  const save = async () => {
+    setErr("");
+    if (!form.title.trim()) return setErr("Title is required.");
+    if (!form.assigned_to) return setErr("Assignee is required.");
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+      Array.from(files).forEach(f => fd.append("files", f));
+      await api.createAdhocTask(fd);
+      onSaved();
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+
+  return (
+    <Modal title="Assign new ad-hoc task" onClose={onClose}>
+      <div className="space-y-3">
+        <div><Label>Title *</Label><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} autoFocus /></div>
+        <div><Label>Description</Label><textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2} className="f-body w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200" /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Assignee *</Label>
+            <select value={form.assigned_to} onChange={e => setForm({ ...form, assigned_to: e.target.value })} className="f-body w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm bg-white">
+              {team.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <Label>Priority</Label>
+            <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} className="f-body w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm bg-white">
+              <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="URGENT">Urgent</option>
+            </select>
+          </div>
+        </div>
+        <div><Label>Due Date & Time *</Label><Input type="datetime-local" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} /></div>
+        <div>
+          <Label>Attachments</Label>
+          <input ref={fileRef} type="file" multiple className="hidden" onChange={e => setFiles(e.target.files)} />
+          <div className="flex items-center gap-2">
+            <Btn kind="outline" small onClick={() => fileRef.current?.click()}><Paperclip size={13} /> Select files</Btn>
+            {files.length > 0 && <span className="text-xs text-gray-500">{files.length} file(s) selected</span>}
+          </div>
+        </div>
+        {err && <p className="text-xs text-red-600">{err}</p>}
+        <div className="flex gap-2 pt-2">
+          <Btn onClick={save} disabled={busy}>{busy ? <Loader2 size={13} className="animate-spin" /> : "Assign Task"}</Btn>
+          <Btn kind="ghost" onClick={onClose}>Cancel</Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 /* ================= ADMIN ================= */
 function AdminShell({ me, signOut }) {
   const [tab, setTab] = useState("dashboard");
@@ -121,6 +318,7 @@ function AdminShell({ me, signOut }) {
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "projects", label: "Projects", icon: FolderKanban },
+    { id: "tasks", label: "Tasks", icon: CheckCircle2 },
     { id: "team", label: "Team", icon: Users },
     { id: "clients", label: "Clients", icon: Briefcase },
   ];
@@ -143,6 +341,7 @@ function AdminShell({ me, signOut }) {
         ))}
       </nav>
       {tab === "dashboard" && <Dashboard onOpen={(id) => { setTab("projects"); setOpenId(id); }} />}
+      {tab === "tasks" && <AdHocTasksTab me={me} isAdmin={true} />}
       {tab === "team" && <TeamTab />}
       {tab === "clients" && <ClientsTab />}
       {tab === "projects" && (openId
@@ -376,13 +575,28 @@ function NewProject({ onDone }) {
   const [teamIds, setTeamIds] = useState([]);
   const [docText, setDocText] = useState(""); const [pdf, setPdf] = useState(null);
   const [phase, setPhase] = useState("form"); const [err, setErr] = useState("");
-  const [draft, setDraft] = useState(null); // {brief, rows}
+  const [draft, setDraft] = useState(null);
+  const [newClient, setNewClient] = useState({ show: false, name: "", contact: "", saving: false });
   const fileRef = useRef(null);
 
   useEffect(() => {
     api.users().then(u => setTeam(u.filter(x => x.role !== "ADMIN")));
     api.clients().then(setClients);
   }, []);
+
+  const saveNewClient = async () => {
+    if (!newClient.name.trim()) return;
+    setNewClient(s => ({ ...s, saving: true }));
+    try {
+      const c = await api.addClient({ name: newClient.name.trim(), contact: newClient.contact.trim() });
+      setClients(prev => [...prev, c]);
+      setForm(f => ({ ...f, client: c.id }));
+      setNewClient({ show: false, name: "", contact: "", saving: false });
+    } catch (e) {
+      setNewClient(s => ({ ...s, saving: false }));
+      setErr(e.message);
+    }
+  };
 
   const generate = async () => {
     setErr("");
@@ -403,10 +617,17 @@ function NewProject({ onDone }) {
 
   const save = async () => {
     try {
-      const p = await api.createProject({
-        ...form, client: form.client || null, team: teamIds,
-        brief: draft.brief, rows: draft.rows,
-      });
+      const fd = new FormData();
+      fd.append("name", form.name);
+      if (form.client) fd.append("client", form.client);
+      fd.append("start_date", form.start_date);
+      fd.append("weeks", form.weeks);
+      fd.append("team", teamIds.join(","));
+      fd.append("brief", JSON.stringify(draft.brief));
+      fd.append("rows", JSON.stringify(draft.rows));
+      if (pdf) fd.append("sow_pdf", pdf);
+      
+      const p = await api.createProject(fd);
       onDone(p);
     } catch (e) { setErr(e.message); }
   };
@@ -444,11 +665,42 @@ function NewProject({ onDone }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Client</Label>
-            <select value={form.client} onChange={e => setForm({ ...form, client: e.target.value })}
-              className="f-body w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm bg-white">
-              <option value="">— none —</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            {newClient.show ? (
+              <div className="border border-gray-300 rounded-md p-3 bg-gray-50 space-y-2">
+                <Input
+                  placeholder="Client name *"
+                  value={newClient.name}
+                  onChange={e => setNewClient(s => ({ ...s, name: e.target.value }))}
+                  autoFocus
+                />
+                <Input
+                  placeholder="Contact (optional)"
+                  value={newClient.contact}
+                  onChange={e => setNewClient(s => ({ ...s, contact: e.target.value }))}
+                />
+                <div className="flex gap-2">
+                  <Btn small onClick={saveNewClient} disabled={newClient.saving || !newClient.name.trim()}>
+                    {newClient.saving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Save client
+                  </Btn>
+                  <Btn kind="ghost" small onClick={() => setNewClient({ show: false, name: "", contact: "", saving: false })}>
+                    Cancel
+                  </Btn>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <select value={form.client} onChange={e => setForm({ ...form, client: e.target.value })}
+                  className="f-body flex-1 border border-gray-300 rounded-md px-3 py-2.5 text-sm bg-white">
+                  <option value="">— none —</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <button type="button"
+                  onClick={() => setNewClient(s => ({ ...s, show: true }))}
+                  className="shrink-0 text-xs f-disp font-semibold px-3 py-2 rounded-md border border-dashed border-gray-400 text-gray-600 hover:border-red-400 hover:text-red-600 transition-colors inline-flex items-center gap-1">
+                  <Plus size={12} /> New
+                </button>
+              </div>
+            )}
           </div>
           <div><Label>SOW ref (optional)</Label><Input value={form.ref} onChange={e => setForm({ ...form, ref: e.target.value })} placeholder="JMS-AGR-2026-0xx" /></div>
         </div>
@@ -565,6 +817,10 @@ function ProjectDetail({ projectId, onBack }) {
     await api.patchTask(taskId, { developer: devId });
     load();
   };
+  const saveComment = async (taskId, comment) => {
+    setTasks(tasks.map(t => t.id === taskId ? { ...t, comment } : t));
+    await api.patchTask(taskId, { comment });
+  };
   const removeProject = async () => {
     if (!confirm(`Delete project "${project.name}" and its plan?`)) return;
     await api.deleteProject(projectId); onBack();
@@ -595,10 +851,12 @@ function ProjectDetail({ projectId, onBack }) {
         </Card>
       )}
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 flex-wrap">
         <Btn kind={view === "plan" ? "primary" : "ghost"} small onClick={() => setView("plan")}>Plan</Btn>
         <Btn kind={view === "gantt" ? "primary" : "ghost"} small onClick={() => setView("gantt")}><BarChart3 size={13} /> Gantt</Btn>
         <Btn kind={view === "report" ? "primary" : "ghost"} small onClick={() => setView("report")}><Mail size={13} /> Weekly report</Btn>
+        <Btn kind={view === "daily_report" ? "primary" : "ghost"} small onClick={() => setView("daily_report")}><Mail size={13} /> Daily report</Btn>
+        <Btn kind={view === "docs" ? "primary" : "ghost"} small onClick={() => setView("docs")}><Paperclip size={13} /> Documents</Btn>
       </div>
 
       {view === "plan" && (
@@ -611,11 +869,13 @@ function ProjectDetail({ projectId, onBack }) {
           </div>
           <p className="text-[11px] text-gray-400 mb-3">Change the developer in any row to re-share that task — they're notified and it moves to their list.</p>
           <TaskTable tasks={tasks} filterDev={filterDev} onToggle={toggle}
-            reassignOptions={project.team_detail} onReassign={reassign} />
+            reassignOptions={project.team_detail} onReassign={reassign} onComment={saveComment} />
         </>
       )}
       {view === "gantt" && <GanttView projectId={projectId} project={project} />}
       {view === "report" && <WeeklyReport projectId={projectId} project={project} tasks={tasks} />}
+      {view === "daily_report" && <DailyReport projectId={projectId} project={project} tasks={tasks} />}
+      {view === "docs" && <DocumentsView projectId={projectId} project={project} />}
 
       {modal === "summary" && <SummaryModal projectId={projectId} name={project.name} onClose={() => setModal(null)} />}
       {modal === "adjust" && <AdjustModal projectId={projectId} onClose={() => setModal(null)} onApplied={() => { setModal(null); load(); }} />}
@@ -625,7 +885,25 @@ function ProjectDetail({ projectId, onBack }) {
 }
 
 /* ---------- Task table (saved tasks) ---------- */
-function TaskTable({ tasks, filterDev, onToggle, reassignOptions, onReassign }) {
+function TaskTable({ tasks, filterDev, onToggle, reassignOptions, onReassign, onComment }) {
+  const [expanded, setExpanded] = useState(null);
+  const [commentText, setCommentText] = useState("");
+
+  const toggleExpand = (t) => {
+    if (expanded === t.id) {
+      setExpanded(null);
+    } else {
+      setExpanded(t.id);
+      setCommentText(t.comment || "");
+    }
+  };
+
+  const handleSaveComment = (t) => {
+    if (t.comment !== commentText) {
+      onComment(t.id, commentText);
+    }
+    setExpanded(null);
+  };
   const weeks = useMemo(() => {
     const m = {};
     tasks.forEach(t => { (m[t.week] = m[t.week] || []).push(t); });
@@ -647,25 +925,60 @@ function TaskTable({ tasks, filterDev, onToggle, reassignOptions, onReassign }) 
               <table className="w-full text-sm min-w-[560px]">
                 <tbody>
                   {visible.map(r => (
-                    <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                      <td className="px-4 py-2.5 w-14 f-disp font-bold text-xs" style={{ color: RED }}>D{r.day_num}</td>
-                      <td className="py-2.5 w-20 text-xs text-gray-500 whitespace-nowrap">{fmt(r.date)}</td>
-                      <td className="py-2.5 w-32">
-                        {reassignOptions ? (
-                          <select value={r.developer} onChange={e => onReassign(r.id, Number(e.target.value))}
-                            className="f-disp font-semibold text-xs bg-transparent border border-transparent hover:border-gray-300 rounded px-1 py-0.5 cursor-pointer">
-                            {reassignOptions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                          </select>
-                        ) : <span className="f-disp font-semibold text-xs">{r.developer_name}</span>}
-                      </td>
-                      <td className="py-2.5 w-28 text-xs text-gray-500">{r.module}</td>
-                      <td className="py-2.5 pr-3"><span className={r.status === "DONE" ? "line-through text-gray-400" : ""}>{r.title}</span></td>
-                      <td className="px-3 py-2.5 w-10 text-right">
-                        <button onClick={() => onToggle(r)}>
-                          {r.status === "DONE" ? <CheckCircle2 size={18} className="text-green-600" /> : <Circle size={18} className="text-gray-300 hover:text-gray-500" />}
-                        </button>
-                      </td>
-                    </tr>
+                    <React.Fragment key={r.id}>
+                      <tr className={`border-b border-gray-100 last:border-0 hover:bg-gray-50 ${expanded === r.id ? "bg-gray-50" : ""}`}>
+                        <td className="px-4 py-2.5 w-14 f-disp font-bold text-xs" style={{ color: RED }}>D{r.day_num}</td>
+                        <td className="py-2.5 w-20 text-xs text-gray-500 whitespace-nowrap">{fmt(r.date)}</td>
+                        <td className="py-2.5 w-32">
+                          {reassignOptions ? (
+                            <select value={r.developer} onChange={e => onReassign(r.id, Number(e.target.value))}
+                              className="f-disp font-semibold text-xs bg-transparent border border-transparent hover:border-gray-300 rounded px-1 py-0.5 cursor-pointer">
+                              {reassignOptions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                          ) : <span className="f-disp font-semibold text-xs">{r.developer_name}</span>}
+                        </td>
+                        <td className="py-2.5 w-28 text-xs text-gray-500">{r.module}</td>
+                        <td className="py-2.5 pr-3">
+                          <span className={r.status === "DONE" ? "line-through text-gray-400" : ""}>{r.title}</span>
+                          {r.comment && (
+                            <div className="text-[11px] text-gray-500 mt-1 flex items-start gap-1 max-w-sm truncate" title={r.comment}>
+                              <MessageSquare size={10} className="shrink-0 mt-0.5" />
+                              <span className="truncate">{r.comment}</span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-right w-24">
+                          <div className="flex justify-end gap-3 items-center">
+                            <button onClick={() => toggleExpand(r)} title="Comments">
+                              <MessageSquare size={16} className={r.comment ? "text-indigo-500 fill-indigo-100" : "text-gray-300 hover:text-gray-500"} />
+                            </button>
+                            <button onClick={() => onToggle(r)}>
+                              {r.status === "DONE" ? <CheckCircle2 size={18} className="text-green-600" /> : <Circle size={18} className="text-gray-300 hover:text-gray-500" />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {expanded === r.id && (
+                        <tr className="bg-indigo-50/30 border-b border-gray-100">
+                          <td colSpan={6} className="px-4 py-3">
+                            <div className="flex gap-2">
+                              <textarea
+                                value={commentText}
+                                onChange={e => setCommentText(e.target.value)}
+                                placeholder="Add a comment or note about this task..."
+                                className="f-body flex-1 text-sm bg-white border border-gray-300 rounded-md p-2 focus:outline-none focus:border-indigo-400"
+                                rows={2}
+                                autoFocus
+                              />
+                              <div className="flex flex-col gap-2 shrink-0 justify-end">
+                                <Btn small onClick={() => handleSaveComment(r)}>Save note</Btn>
+                                <Btn small kind="ghost" onClick={() => setExpanded(null)}>Cancel</Btn>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
@@ -683,35 +996,15 @@ function GanttView({ projectId, project }) {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const chartRef = useRef(null);
 
   useEffect(() => { api.gantt(projectId).then(setData); }, [projectId]);
-
-  // Fallback: rasterize the on-screen chart when the server-side PDF fails
-  // (e.g. WeasyPrint/GTK missing on the box, or a transient network error).
-  const exportViaBrowser = async () => {
-    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-      import("html2canvas"),
-      import("jspdf"),
-    ]);
-    const node = chartRef.current;
-    const canvas = await html2canvas(node, { backgroundColor: "#ffffff", scale: 2 });
-    const img = canvas.toDataURL("image/png");
-    const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [canvas.width, canvas.height] });
-    pdf.addImage(img, "PNG", 0, 0, canvas.width, canvas.height);
-    pdf.save(`${(project?.name || "project").toLowerCase().replace(/\s+/g, "_")}_gantt_chart.pdf`);
-  };
 
   const download = async () => {
     setErr(""); setBusy(true);
     try {
       await api.ganttPdf(projectId, project?.name || "project");
     } catch (serverErr) {
-      try {
-        await exportViaBrowser();
-      } catch {
-        setErr(serverErr.message || "Couldn't generate the PDF.");
-      }
+      setErr(serverErr.message || "Couldn't generate the PDF.");
     }
     setBusy(false);
   };
@@ -734,7 +1027,7 @@ function GanttView({ projectId, project }) {
       </div>
       {err && <p className="text-xs text-red-600 mb-3 flex items-center gap-1.5"><AlertTriangle size={13} /> {err}</p>}
 
-      <div ref={chartRef} style={{ minWidth: Math.max(700, n_days * 26 + 130) }}>
+      <div style={{ minWidth: Math.max(700, n_days * 26 + 130) }}>
         <div className="flex mb-1">
           <div className="w-28 shrink-0" />
           <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${nWeeks}, 1fr)` }}>
@@ -785,16 +1078,22 @@ function WeeklyReport({ projectId, project, tasks }) {
   const [text, setText] = useState("");
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   useEffect(() => { api.report(projectId, week).then(r => setText(r.text)); }, [projectId, week]);
 
   const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { } };
-  const download = () => {
+  const downloadTxt = () => {
     const blob = new Blob([text], { type: "text/plain" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `${project.name.replace(/\s+/g, "_")}_W${week}_report.txt`;
     a.click();
+  };
+  const downloadPdf = async () => {
+    setPdfBusy(true);
+    try { await api.reportPdf(projectId, week, project.name); } catch (e) { alert(e.message); }
+    setPdfBusy(false);
   };
   const send = async () => { await api.emailReport(projectId, week); setSent(true); setTimeout(() => setSent(false), 2500); };
 
@@ -807,13 +1106,65 @@ function WeeklyReport({ projectId, project, tasks }) {
             {weekNums.map(w => <option key={w} value={w}>W{w}</option>)}
           </select>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Btn kind="outline" small onClick={copy}><Copy size={13} /> {copied ? "Copied!" : "Copy"}</Btn>
-          <Btn kind="outline" small onClick={download}><Download size={13} /> Download</Btn>
+          <Btn kind="outline" small onClick={downloadTxt}><Download size={13} /> TXT</Btn>
+          <Btn kind="outline" small onClick={downloadPdf} disabled={pdfBusy}>
+            {pdfBusy ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} PDF
+          </Btn>
           <Btn small onClick={send}><Mail size={13} /> {sent ? "Sent!" : "Email me now"}</Btn>
         </div>
       </div>
-      <p className="text-[11px] text-gray-400 mb-3">This report is also emailed to you automatically every Friday at 6 PM.</p>
+      <p className="text-[11px] text-gray-400 mb-3">This report is auto-saved as a PDF to Documents every Friday at 18:30.</p>
+      <pre className="text-xs bg-gray-50 border border-gray-200 rounded-md p-4 overflow-x-auto whitespace-pre-wrap leading-relaxed">{text || "Loading…"}</pre>
+    </Card>
+  );
+}
+
+/* ---------- Daily report ---------- */
+function DailyReport({ projectId, project, tasks }) {
+  const dates = [...new Set(tasks.map(t => t.date))].sort();
+  const today = todayISO();
+  const current = dates.includes(today) ? today : (dates[dates.length - 1] || today);
+  const [date, setDate] = useState(current);
+  const [text, setText] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  useEffect(() => { api.dailyReport(projectId, date).then(r => setText(r.text)); }, [projectId, date]);
+
+  const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { } };
+  const downloadTxt = () => {
+    const blob = new Blob([text], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${project.name.replace(/\s+/g, "_")}_${date}_daily.txt`;
+    a.click();
+  };
+  const downloadPdf = async () => {
+    setPdfBusy(true);
+    try { await api.dailyReportPdf(projectId, date, project.name); } catch (e) { alert(e.message); }
+    setPdfBusy(false);
+  };
+
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <Label>Date</Label>
+          <select value={date} onChange={e => setDate(e.target.value)} className="f-body border border-gray-300 rounded-md px-3 py-2 text-sm bg-white">
+            {dates.map(d => <option key={d} value={d}>{fmt(d)}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Btn kind="outline" small onClick={copy}><Copy size={13} /> {copied ? "Copied!" : "Copy"}</Btn>
+          <Btn kind="outline" small onClick={downloadTxt}><Download size={13} /> TXT</Btn>
+          <Btn kind="outline" small onClick={downloadPdf} disabled={pdfBusy}>
+            {pdfBusy ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} PDF
+          </Btn>
+        </div>
+      </div>
+      <p className="text-[11px] text-gray-400 mb-3">Daily reports are auto-saved as PDFs to Documents every Mon-Fri at 18:30.</p>
       <pre className="text-xs bg-gray-50 border border-gray-200 rounded-md p-4 overflow-x-auto whitespace-pre-wrap leading-relaxed">{text || "Loading…"}</pre>
     </Card>
   );
@@ -943,20 +1294,6 @@ function DevShell({ me, signOut }) {
   const overdue = tasks.filter(t => t.date < today && t.status !== "DONE");
   const upcoming = tasks.filter(t => t.date > today).slice(0, 15);
 
-  const Row = ({ t, showDate }) => (
-    <div className="flex items-start gap-3 px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50">
-      <button onClick={() => toggle(t)} className="mt-0.5 shrink-0">
-        {t.status === "DONE" ? <CheckCircle2 size={20} className="text-green-600" /> : <Circle size={20} className="text-gray-300 hover:text-gray-500" />}
-      </button>
-      <div className="min-w-0">
-        <div className={`text-sm ${t.status === "DONE" ? "line-through text-gray-400" : "text-gray-900"}`}>{t.title}</div>
-        <div className="text-xs text-gray-500 mt-0.5">
-          <span className="f-disp font-bold" style={{ color: RED }}>D{t.day_num}</span> · {t.project_name} · {t.module}{showDate ? ` · ${fmt(t.date)}` : ""}
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
       <header className="flex items-center justify-between mb-5">
@@ -979,17 +1316,175 @@ function DevShell({ me, signOut }) {
       ))}
 
       <nav className="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto">
-        {[["today", `Today (${todayTasks.length})`], ["overdue", `Overdue (${overdue.length})`], ["upcoming", "Upcoming"], ["all", "Full plan"]].map(([id, label]) => (
+        {[["today", `Today (${todayTasks.length})`], ["overdue", `Overdue (${overdue.length})`], ["upcoming", "Upcoming"], ["all", "Full plan"], ["adhoc", "My Tasks"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`f-disp text-sm font-semibold px-3 py-2 -mb-px border-b-2 whitespace-nowrap ${tab === id ? "" : "border-transparent text-gray-500"}`}
             style={tab === id ? { color: RED, borderColor: RED } : {}}>{label}</button>
         ))}
       </nav>
 
-      {tab === "today" && <Card>{todayTasks.length ? todayTasks.map(t => <Row key={t.id} t={t} />) : <div className="p-8 text-center text-sm text-gray-400">No tasks scheduled for today. Check Upcoming.</div>}</Card>}
-      {tab === "overdue" && <Card>{overdue.length ? overdue.map(t => <Row key={t.id} t={t} showDate />) : <div className="p-8 text-center text-sm text-gray-400">Nothing overdue. Well done.</div>}</Card>}
-      {tab === "upcoming" && <Card>{upcoming.length ? upcoming.map(t => <Row key={t.id} t={t} showDate />) : <div className="p-8 text-center text-sm text-gray-400">Nothing coming up yet.</div>}</Card>}
-      {tab === "all" && <Card>{tasks.map(t => <Row key={t.id} t={t} showDate />)}</Card>}
+      {tab === "today" && <Card>{todayTasks.length ? todayTasks.map(t => <DevRow key={t.id} t={t} onToggle={toggle} setTasks={setTasks} tasks={tasks} />) : <div className="p-8 text-center text-sm text-gray-400">No tasks scheduled for today. Check Upcoming.</div>}</Card>}
+      {tab === "overdue" && <Card>{overdue.length ? overdue.map(t => <DevRow key={t.id} t={t} showDate onToggle={toggle} setTasks={setTasks} tasks={tasks} />) : <div className="p-8 text-center text-sm text-gray-400">Nothing overdue. Well done.</div>}</Card>}
+      {tab === "upcoming" && <Card>{upcoming.length ? upcoming.map(t => <DevRow key={t.id} t={t} showDate onToggle={toggle} setTasks={setTasks} tasks={tasks} />) : <div className="p-8 text-center text-sm text-gray-400">Nothing coming up yet.</div>}</Card>}
+      {tab === "all" && <Card>{tasks.map(t => <DevRow key={t.id} t={t} showDate onToggle={toggle} setTasks={setTasks} tasks={tasks} />)}</Card>}
+      {tab === "adhoc" && <AdHocTasksTab me={me} isAdmin={false} />}
     </div>
+  );
+}
+
+function DevRow({ t, showDate, onToggle, setTasks, tasks }) {
+  const [expanded, setExpanded] = useState(false);
+  const [commentText, setCommentText] = useState(t.comment || "");
+
+  const handleSave = async () => {
+    if (t.comment !== commentText) {
+      setTasks(tasks.map(x => x.id === t.id ? { ...x, comment: commentText } : x));
+      await api.patchTask(t.id, { comment: commentText });
+    }
+    setExpanded(false);
+  };
+
+  return (
+    <div className="border-b border-gray-100 last:border-0">
+      <div className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 group">
+        <button onClick={() => onToggle(t)} className="mt-0.5 shrink-0">
+          {t.status === "DONE" ? <CheckCircle2 size={20} className="text-green-600" /> : <Circle size={20} className="text-gray-300 hover:text-gray-500" />}
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className={`text-sm ${t.status === "DONE" ? "line-through text-gray-400" : "text-gray-900"}`}>{t.title}</div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            <span className="f-disp font-bold" style={{ color: RED }}>D{t.day_num}</span> · {t.project_name} · {t.module}{showDate ? ` · ${fmt(t.date)}` : ""}
+          </div>
+          {t.comment && (
+            <div className="text-[11px] text-gray-500 mt-1 flex items-start gap-1 max-w-sm truncate" title={t.comment}>
+              <MessageSquare size={10} className="shrink-0 mt-0.5" />
+              <span className="truncate">{t.comment}</span>
+            </div>
+          )}
+        </div>
+        <button onClick={() => { setExpanded(!expanded); setCommentText(t.comment || ""); }} className="shrink-0 pt-1" title="Comments">
+          <MessageSquare size={16} className={t.comment ? "text-indigo-500 fill-indigo-100" : "text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity hover:text-gray-500"} />
+        </button>
+      </div>
+      {expanded && (
+        <div className="px-4 pb-3 pt-1 bg-indigo-50/30">
+          <div className="flex gap-2">
+            <textarea
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              placeholder="Add a comment or note about this task..."
+              className="f-body flex-1 text-sm bg-white border border-gray-300 rounded-md p-2 focus:outline-none focus:border-indigo-400"
+              rows={2}
+              autoFocus
+            />
+            <div className="flex flex-col gap-2 shrink-0 justify-end">
+              <Btn small onClick={handleSave}>Save note</Btn>
+              <Btn small kind="ghost" onClick={() => setExpanded(false)}>Cancel</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Documents ---------- */
+function DocumentsView({ projectId, project }) {
+  const [docs, setDocs] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const fileRef = useRef(null);
+
+  const load = () => api.docs(projectId).then(setDocs);
+  useEffect(() => { load(); }, [projectId]);
+
+  const upload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true); setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("title", file.name);
+      await api.uploadDoc(projectId, fd);
+      load();
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const removeDoc = async (id, title) => {
+    if (!confirm(`Delete document "${title}"?`)) return;
+    await api.deleteDoc(projectId, id);
+    load();
+  };
+
+  if (!docs) return <Spinner text="Loading documents…" />;
+
+  const allDocs = [];
+  if (project?.sow_pdf) {
+    allDocs.push({
+      id: 'sow',
+      title: "Original SOW Document",
+      file_url: project.sow_pdf,
+      uploaded_by_name: "System",
+      uploaded_at: project.created_at,
+      isSow: true
+    });
+  }
+  allDocs.push(...docs);
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="f-disp font-bold text-lg">Project Documents</h2>
+        <div>
+          <input ref={fileRef} type="file" className="hidden" onChange={upload} />
+          <Btn small onClick={() => fileRef.current?.click()} disabled={busy}>
+            {busy ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />} Upload Document
+          </Btn>
+        </div>
+      </div>
+      {err && <p className="text-xs text-red-600 mb-3">{err}</p>}
+
+      {allDocs.length === 0 ? (
+        <div className="text-center text-sm text-gray-400 py-6 border-2 border-dashed border-gray-200 rounded-lg">
+          No documents uploaded yet.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {allDocs.map(d => (
+            <div key={d.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-md hover:bg-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                  <FileText size={16} />
+                </div>
+                <div>
+                  <div className="f-disp font-semibold text-sm">
+                    {d.title} {d.isSow && <span className="ml-2 text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">SOW</span>}
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">
+                    Uploaded by {d.uploaded_by_name || "Unknown"} on {new Date(d.uploaded_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a href={d.file_url} target="_blank" rel="noreferrer" className="text-gray-400 hover:text-indigo-600 transition-colors p-2" title="View Document">
+                  <Eye size={15} />
+                </a>
+                <a href={d.file_url} download target="_blank" rel="noreferrer" className="text-gray-400 hover:text-indigo-600 transition-colors p-2" title="Download">
+                  <Download size={15} />
+                </a>
+                {!d.isSow && (
+                  <button onClick={() => removeDoc(d.id, d.title)} className="text-gray-400 hover:text-red-600 transition-colors p-2" title="Delete">
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
