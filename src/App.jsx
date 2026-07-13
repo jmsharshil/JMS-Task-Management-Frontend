@@ -571,7 +571,7 @@ function ProjectsTab({ onOpen }) {
 
 function NewProject({ onDone }) {
   const [team, setTeam] = useState([]); const [clients, setClients] = useState([]);
-  const [form, setForm] = useState({ name: "", client: "", ref: "", start_date: todayISO(), weeks: 8 });
+  const [form, setForm] = useState({ name: "", client: "", ref: "", start_date: todayISO(), weeks: 8, current_week: 1 });
   const [teamIds, setTeamIds] = useState([]);
   const [docText, setDocText] = useState(""); const [pdf, setPdf] = useState(null);
   const [phase, setPhase] = useState("form"); const [err, setErr] = useState("");
@@ -622,6 +622,7 @@ function NewProject({ onDone }) {
       if (form.client) fd.append("client", form.client);
       fd.append("start_date", form.start_date);
       fd.append("weeks", form.weeks);
+      fd.append("current_week", form.current_week);
       fd.append("team", teamIds.join(","));
       fd.append("brief", JSON.stringify(draft.brief));
       fd.append("rows", JSON.stringify(draft.rows));
@@ -704,9 +705,10 @@ function NewProject({ onDone }) {
           </div>
           <div><Label>SOW ref (optional)</Label><Input value={form.ref} onChange={e => setForm({ ...form, ref: e.target.value })} placeholder="JMS-AGR-2026-0xx" /></div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <div><Label>Start date</Label><Input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} /></div>
-          <div><Label>Duration (weeks)</Label><Input type="number" min={1} max={16} value={form.weeks} onChange={e => setForm({ ...form, weeks: e.target.value })} /></div>
+          <div><Label>Duration (weeks)</Label><Input type="number" min={1} max={16} value={form.weeks} onChange={e => setForm({ ...form, weeks: parseInt(e.target.value) || 1, current_week: Math.min(form.current_week, parseInt(e.target.value) || 1) })} /></div>
+          <div><Label>Current Week</Label><Input type="number" min={1} max={form.weeks} value={form.current_week} onChange={e => setForm({ ...form, current_week: parseInt(e.target.value) || 1 })} title="Tasks from previous weeks will be auto-completed" /></div>
         </div>
         <div>
           <Label>Team on this project</Label>
