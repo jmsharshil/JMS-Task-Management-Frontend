@@ -381,9 +381,12 @@ function AdminShell({ me, signOut }) {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <header className="flex items-center justify-between mb-6">
-        <div className="rail pl-4">
-          <div className="f-disp text-[10px] font-bold tracking-widest uppercase" style={{ color: RED }}>JMS Tech</div>
-          <h1 className="f-disp text-2xl font-bold" style={{ color: INK }}>Delivery Hub</h1>
+        <div className="flex items-center gap-2.5">
+          <img src="https://hrmsknowcraftstorage.blob.core.windows.net/media/JMS.png" alt="JMS" style={{ height: 36, width: "auto", objectFit: "contain" }} />
+          <div>
+            <h1 className="f-disp text-xl font-bold leading-tight" style={{ color: INK }}>Delivery Hub</h1>
+            <div className="f-disp text-[10px] font-bold tracking-widest uppercase leading-none" style={{ color: RED }}>JMS Tech</div>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setShowChangePwd(true)} className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1" title="Change password">
@@ -394,7 +397,7 @@ function AdminShell({ me, signOut }) {
         </div>
       </header>
       {showChangePwd && <ChangePasswordModal onClose={() => setShowChangePwd(false)} />}
-      <nav className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto">
+      <nav className="flex gap-1 mb-6 border-b border-gray-200">
         {tabs.map(t => (
           <button key={t.id} onClick={() => { setTab(t.id); setOpenId(null); }}
             className={`f-disp text-sm font-semibold px-4 py-2.5 -mb-px border-b-2 inline-flex items-center gap-2 whitespace-nowrap ${tab === t.id ? "" : "border-transparent text-gray-500 hover:text-gray-800"}`}
@@ -1421,10 +1424,12 @@ function DevShell({ me, signOut }) {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
       <header className="flex items-center justify-between mb-5">
-        <div className="rail pl-4">
-          <div className="f-disp text-[10px] font-bold tracking-widest uppercase" style={{ color: RED }}>JMS Delivery Hub</div>
-          <h1 className="f-disp text-xl font-bold">{me.name}</h1>
-          <p className="text-xs text-gray-500">{me.designation || "Developer"} · {fmtLong(today)}</p>
+        <div className="flex items-center gap-2.5">
+          <img src="https://hrmsknowcraftstorage.blob.core.windows.net/media/JMS.png" alt="JMS" style={{ height: 36, width: "auto", objectFit: "contain" }} />
+          <div>
+            <h1 className="f-disp text-lg font-bold leading-tight" style={{ color: INK }}>{me.name}</h1>
+            <p className="text-xs text-gray-500 leading-none mt-0.5">{me.designation || "Developer"} · {fmtLong(today)}</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={load} className="text-gray-400 hover:text-gray-700" title="Refresh"><RefreshCw size={15} /></button>
@@ -1439,7 +1444,7 @@ function DevShell({ me, signOut }) {
         </Card>
       ))}
 
-      <nav className="flex gap-1 mb-4 border-b border-gray-200 overflow-auto">
+      <nav className="flex gap-1 mb-4 border-b border-gray-200">
         {[["today", `Today (${todayTasks.length})`], ["overdue", `Overdue (${overdue.length})`], ["upcoming", "Upcoming"], ["all", "Full plan"], ["adhoc", "My Tasks"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`f-disp text-sm font-semibold px-3 py-2 -mb-px border-b-2 whitespace-nowrap ${tab === id ? "" : "border-transparent text-gray-500"}`}
