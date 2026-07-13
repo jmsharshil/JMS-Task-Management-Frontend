@@ -31,6 +31,8 @@ export const api = {
   },
   addUser: (u) => request("/auth/users/", { method: "POST", body: u }),
   delUser: (id) => request(`/auth/users/${id}/`, { method: "DELETE" }),
+  resetPassword: (id, password) => request(`/auth/users/${id}/reset-password/`, { method: "POST", body: { password } }),
+  changePassword: (old_password, new_password) => request("/auth/change-password/", { method: "POST", body: { old_password, new_password } }),
 
   clients: () => request("/clients/"),
   addClient: (c) => request("/clients/", { method: "POST", body: c }),
