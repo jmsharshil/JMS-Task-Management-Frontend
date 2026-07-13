@@ -204,7 +204,7 @@ function AdHocTaskRow({ t, isAdmin, onToggle, onComment, onDelete }) {
           {t.description && <p className="text-xs text-gray-600 mb-2">{t.description}</p>}
 
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500">
-            {isAdmin ? <span>Assignee: <b>{t.assigned_to_name}</b></span> : <span>From: <b>{t.created_by_name}</b></span>}
+            {isAdmin ? <span>Assignees: <b>{t.assignees_names}</b></span> : <span>From: <b>{t.created_by_name}</b></span>}
             <span>Due: {t.due_date ? new Date(t.due_date).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
             {t.attachments?.length > 0 && (
               <div className="flex items-center gap-1">
@@ -253,7 +253,7 @@ function AdHocTaskRow({ t, isAdmin, onToggle, onComment, onDelete }) {
 
 function NewAdHocTaskModal({ team, onClose, onSaved }) {
   const nowLocal = () => { const d = new Date(); d.setHours(18, 0, 0, 0); return d.toISOString().slice(0, 16); };
-  const [form, setForm] = useState({ title: "", description: "", assigned_to: team[0]?.id || "", priority: "MEDIUM", due_date: nowLocal() });
+  const [form, setForm] = useState({ title: "", description: "", assignees: [String(team[0]?.id || "")], priority: "MEDIUM", due_date: nowLocal() });
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -262,11 +262,19 @@ function NewAdHocTaskModal({ team, onClose, onSaved }) {
   const save = async () => {
     setErr("");
     if (!form.title.trim()) return setErr("Title is required.");
-    if (!form.assigned_to) return setErr("Assignee is required.");
+    if (!form.assignees || form.assignees.length === 0 || !form.assignees[0]) return setErr("At least one assignee is required.");
     setBusy(true);
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+      Object.entries(form).forEach(([k, v]) => {
+        if (k === "assignees") {
+          v.forEach(id => {
+            if (id) fd.append("assignees", id);
+          });
+        } else {
+          fd.append(k, v);
+        }
+      });
       Array.from(files).forEach(f => fd.append("files", f));
       await api.createAdhocTask(fd);
       onSaved();
@@ -280,10 +288,22 @@ function NewAdHocTaskModal({ team, onClose, onSaved }) {
         <div><Label>Description</Label><textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2} className="f-body w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200" /></div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label>Assignee *</Label>
-            <select value={form.assigned_to} onChange={e => setForm({ ...form, assigned_to: e.target.value })} className="f-body w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm bg-white">
-              {team.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+            <Label>Assignees *</Label>
+            <div className="f-body border border-gray-300 rounded-md p-1.5 text-sm bg-white max-h-[104px] overflow-y-auto flex flex-col">
+              {team.map(t => (
+                <label key={t.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
+                  <input type="checkbox" checked={form.assignees.includes(String(t.id))} onChange={e => {
+                    const checked = e.target.checked;
+                    const idStr = String(t.id);
+                    setForm(prev => ({
+                      ...prev,
+                      assignees: checked ? [...prev.assignees, idStr] : prev.assignees.filter(id => id !== idStr)
+                    }));
+                  }} className="text-red-600 focus:ring-red-500 rounded border-gray-300" />
+                  <span className="truncate">{t.name}</span>
+                </label>
+              ))}
+            </div>
           </div>
           <div>
             <Label>Priority</Label>
