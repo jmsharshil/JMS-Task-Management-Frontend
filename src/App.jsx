@@ -311,6 +311,61 @@ function NewAdHocTaskModal({ team, onClose, onSaved }) {
   );
 }
 
+/* ================= CHANGE PASSWORD ================= */
+function ChangePasswordModal({ onClose }) {
+  const [form, setForm] = useState({ old_password: "", new_password: "", confirm: "" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(false);
+
+  const submit = async () => {
+    setErr("");
+    if (form.new_password.length < 6) return setErr("New password must be at least 6 characters.");
+    if (form.new_password !== form.confirm) return setErr("Passwords do not match.");
+    setBusy(true);
+    try {
+      await api.changePassword(form.old_password, form.new_password);
+      setDone(true);
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+
+  return (
+    <Modal title="Change Password" onClose={onClose}>
+      {done ? (
+        <div className="text-center py-4">
+          <CheckCircle2 size={36} className="mx-auto mb-3 text-green-500" />
+          <p className="f-disp font-semibold">Password changed successfully!</p>
+          <p className="text-xs text-gray-500 mt-1">Use your new password the next time you sign in.</p>
+          <Btn className="mt-4" onClick={onClose}>Close</Btn>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <Label>Current password</Label>
+            <Input type="password" value={form.old_password} onChange={e => setForm({ ...form, old_password: e.target.value })} autoFocus />
+          </div>
+          <div>
+            <Label>New password</Label>
+            <Input type="password" value={form.new_password} onChange={e => setForm({ ...form, new_password: e.target.value })} placeholder="Min. 6 characters" />
+          </div>
+          <div>
+            <Label>Confirm new password</Label>
+            <Input type="password" value={form.confirm} onChange={e => setForm({ ...form, confirm: e.target.value })} />
+          </div>
+          {err && <p className="text-xs text-red-600">{err}</p>}
+          <div className="flex gap-2 pt-1">
+            <Btn onClick={submit} disabled={busy}>
+              {busy ? <Loader2 size={13} className="animate-spin" /> : "Change Password"}
+            </Btn>
+            <Btn kind="ghost" onClick={onClose}>Cancel</Btn>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 /* ================= ADMIN ================= */
 function AdminShell({ me, signOut }) {
   const [tab, setTab] = useState("dashboard");
@@ -322,6 +377,7 @@ function AdminShell({ me, signOut }) {
     { id: "team", label: "Team", icon: Users },
     { id: "clients", label: "Clients", icon: Briefcase },
   ];
+  const [showChangePwd, setShowChangePwd] = useState(false);
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <header className="flex items-center justify-between mb-6">
@@ -329,8 +385,15 @@ function AdminShell({ me, signOut }) {
           <div className="f-disp text-[10px] font-bold tracking-widest uppercase" style={{ color: RED }}>JMS Tech</div>
           <h1 className="f-disp text-2xl font-bold" style={{ color: INK }}>Delivery Hub</h1>
         </div>
-        <button onClick={signOut} className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1"><LogOut size={13} /> Sign out</button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowChangePwd(true)} className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1" title="Change password">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg>
+            Change Password
+          </button>
+          <button onClick={signOut} className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1"><LogOut size={13} /> Sign out</button>
+        </div>
       </header>
+      {showChangePwd && <ChangePasswordModal onClose={() => setShowChangePwd(false)} />}
       <nav className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto">
         {tabs.map(t => (
           <button key={t.id} onClick={() => { setTab(t.id); setOpenId(null); }}
@@ -448,10 +511,63 @@ function Dashboard({ onOpen }) {
 }
 
 /* ---------- Team ---------- */
+function ResetPasswordModal({ user, onClose }) {
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(false);
+
+  const submit = async () => {
+    setErr("");
+    if (password.length < 6) return setErr("Password must be at least 6 characters.");
+    setBusy(true);
+    try {
+      await api.resetPassword(user.id, password);
+      setDone(true);
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+
+  return (
+    <Modal title={`Reset password — ${user.name}`} onClose={onClose}>
+      {done ? (
+        <div className="text-center py-4">
+          <CheckCircle2 size={36} className="mx-auto mb-3 text-green-500" />
+          <p className="f-disp font-semibold">Password reset successfully.</p>
+          <p className="text-xs text-gray-500 mt-1">{user.name} will receive an email with the new credentials.</p>
+          <Btn className="mt-4" onClick={onClose}>Close</Btn>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">Enter a new password for <strong>{user.name}</strong>. They will receive an email notification with the new credentials.</p>
+          <div>
+            <Label>New password</Label>
+            <Input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Min. 6 characters"
+              autoFocus
+            />
+          </div>
+          {err && <p className="text-xs text-red-600">{err}</p>}
+          <div className="flex gap-2 pt-1">
+            <Btn onClick={submit} disabled={busy}>
+              {busy ? <Loader2 size={13} className="animate-spin" /> : "Reset Password"}
+            </Btn>
+            <Btn kind="ghost" onClick={onClose}>Cancel</Btn>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 function TeamTab() {
   const [team, setTeam] = useState(null);
   const [form, setForm] = useState({ name: "", designation: "", email: "", phone: "", password: "" });
   const [err, setErr] = useState("");
+  const [resetTarget, setResetTarget] = useState(null);
   const load = () => api.users().then(setTeam);
   useEffect(() => { load(); }, []);
 
@@ -488,13 +604,19 @@ function TeamTab() {
                 <div className="text-xs text-gray-500">{t.designation || t.role} · {t.email}</div>
               </div>
               {t.role !== "ADMIN" && (
-                <button onClick={async () => { if (confirm(`Remove ${t.name}?`)) { await api.delUser(t.id); load(); } }}
-                  className="text-gray-300 hover:text-red-500"><Trash2 size={15} /></button>
+                <div className="flex gap-2">
+                  <button onClick={() => setResetTarget(t)} className="text-gray-300 hover:text-indigo-500" title="Reset password">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg>
+                  </button>
+                  <button onClick={async () => { if (confirm(`Remove ${t.name}?`)) { await api.delUser(t.id); load(); } }}
+                    className="text-gray-300 hover:text-red-500"><Trash2 size={15} /></button>
+                </div>
               )}
             </Card>
           ))}
         </div>
       </div>
+      {resetTarget && <ResetPasswordModal user={resetTarget} onClose={() => setResetTarget(null)} />}
     </div>
   );
 }
