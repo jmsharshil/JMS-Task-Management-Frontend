@@ -10,7 +10,8 @@ async function request(path, { method = "GET", body, form } = {}) {
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body && !form) headers["Content-Type"] = "application/json";
-  const res = await fetch(BASE + path, {
+  const url = path.startsWith("http") ? path : BASE + path;
+  const res = await fetch(url, {
     method, headers,
     body: form ? body : body ? JSON.stringify(body) : undefined,
   });
@@ -40,7 +41,7 @@ export const api = {
 
   dashboard: () => request("/dashboard/"),
 
-  projects: () => request("/projects/"),
+  projects: (params = "") => request(params.startsWith("http") ? params : `/projects/${params}`),
   project: (id) => request(`/projects/${id}/`),
   generatePlan: (formData) => request("/projects/generate-plan/", { method: "POST", body: formData, form: true }),
   createProject: (formData) => request("/projects/", { method: "POST", body: formData, form: true }),
@@ -77,7 +78,7 @@ export const api = {
   updates: (id) => request(`/projects/${id}/updates/`),
   postUpdate: (id, text) => request(`/projects/${id}/updates/`, { method: "POST", body: { text } }),
 
-  tasks: (params = "") => request(`/tasks/${params}`),
+  tasks: (params = "") => request(params.startsWith("http") ? params : `/tasks/${params}`),
   patchTask: (id, body) => request(`/tasks/${id}/`, { method: "PATCH", body }),
 
   docs: (projectId) => request(`/projects/${projectId}/documents/`),
@@ -118,7 +119,7 @@ export const api = {
   },
 
   // Ad-hoc tasks
-  adhocTasks: (params = "") => request(`/adhoc-tasks/${params}`),
+  adhocTasks: (params = "") => request(params.startsWith("http") ? params : `/adhoc-tasks/${params}`),
   createAdhocTask: (formData) => request(`/adhoc-tasks/`, { method: "POST", body: formData, form: true }),
   patchAdhocTask: (id, body) => request(`/adhoc-tasks/${id}/`, { method: "PATCH", body }),
   deleteAdhocTask: (id) => request(`/adhoc-tasks/${id}/`, { method: "DELETE" }),

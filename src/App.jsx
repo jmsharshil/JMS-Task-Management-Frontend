@@ -116,30 +116,34 @@ function Login({ onLogin }) {
 
 /* ================= AD-HOC TASKS ================= */
 function AdHocTasksTab({ me, isAdmin }) {
-  const [tasks, setTasks] = useState(null);
+  const [data, setData] = useState(null);
   const [team, setTeam] = useState([]);
   const [filterUser, setFilterUser] = useState("");
   const [showModal, setShowModal] = useState(false);
 
-  const load = async () => {
-    let q = "";
-    if (isAdmin && filterUser) q = `?assignee=${filterUser}`;
+  const load = async (url = "") => {
+    let q = url;
+    if (!url && isAdmin && filterUser) q = `?assignee=${filterUser}`;
     const [t, tm] = await Promise.all([
       api.adhocTasks(q),
-      isAdmin ? api.team() : Promise.resolve([])
+      isAdmin && !team.length ? api.team() : Promise.resolve(team)
     ]);
-    setTasks(t.results || t);
-    if (isAdmin) setTeam(tm);
+    setData(t);
+    if (isAdmin && !team.length) setTeam(tm);
   };
   useEffect(() => { load(); }, [isAdmin, filterUser]);
-
+  const tasks = data ? (data.results || data) : null;
   const toggle = async (task) => {
     const next = task.status === "DONE" ? "TODO" : "DONE";
-    setTasks(tasks.map(t => t.id === task.id ? { ...t, status: next } : t));
+    const updatedTasks = tasks.map(t => t.id === task.id ? { ...t, status: next } : t);
+    if (data.results) setData({ ...data, results: updatedTasks });
+    else setData(updatedTasks);
     await api.patchAdhocTask(task.id, { status: next });
   };
   const saveComment = async (taskId, comment) => {
-    setTasks(tasks.map(t => t.id === taskId ? { ...t, comment } : t));
+    const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, comment } : t);
+    if (data.results) setData({ ...data, results: updatedTasks });
+    else setData(updatedTasks);
     await api.patchAdhocTask(taskId, { comment });
   };
   const removeTask = async (id) => {
@@ -164,14 +168,16 @@ function AdHocTasksTab({ me, isAdmin }) {
           </div>
         )}
       </div>
-
-      {tasks.length === 0 ? (
-        <Card className="p-8 text-center text-gray-400 text-sm">No ad-hoc tasks found.</Card>
-      ) : (
-        <div className="space-y-3">
-          {tasks.map(t => (
-            <AdHocTaskRow key={t.id} t={t} isAdmin={isAdmin} onToggle={toggle} onComment={saveComment} onDelete={() => removeTask(t.id)} />
-          ))}
+      <div className="space-y-3">
+        {tasks.map(t => (
+          <AdHocTaskRow key={t.id} t={t} isAdmin={isAdmin} onToggle={toggle} onComment={saveComment} onDelete={() => removeTask(t.id)} />
+        ))}
+        {tasks.length === 0 && <Card className="p-8 text-center text-gray-400 text-sm">No ad-hoc tasks found.</Card>}
+      </div>
+      {(data.next || data.previous) && (
+        <div className="flex items-center justify-between mt-4">
+          <Btn kind="outline" small disabled={!data.previous} onClick={() => load(data.previous)}>Previous</Btn>
+          <Btn kind="outline" small disabled={!data.next} onClick={() => load(data.next)}>Next</Btn>
         </div>
       )}
 
@@ -722,13 +728,16 @@ function ClientsTab() {
 
 /* ---------- Projects list + New ---------- */
 function ProjectsTab({ onOpen }) {
-  const [projects, setProjects] = useState(null);
+  const [data, setData] = useState(null);
   const [creating, setCreating] = useState(false);
-  const load = () => api.projects().then(setProjects);
+  const load = (url = "") => api.projects(url).then(setData);
   useEffect(() => { load(); }, []);
 
   if (creating) return <NewProject onDone={(p) => { setCreating(false); load(); if (p) onOpen(p.id); }} />;
-  if (!projects) return <Spinner text="Loading projects…" />;
+  if (!data) return <Spinner text="Loading projects…" />;
+  
+  const projects = data.results || data;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -749,6 +758,12 @@ function ProjectsTab({ onOpen }) {
         ))}
         {projects.length === 0 && <Card className="p-8 text-center text-gray-400 text-sm">No projects yet. Click "New project" to create your first one.</Card>}
       </div>
+      {(data.next || data.previous) && (
+        <div className="flex items-center justify-between mt-4">
+          <Btn kind="outline" small disabled={!data.previous} onClick={() => load(data.previous)}>Previous</Btn>
+          <Btn kind="outline" small disabled={!data.next} onClick={() => load(data.next)}>Next</Btn>
+        </div>
+      )}
     </div>
   );
 }
@@ -1461,9 +1476,12 @@ function DevShell({ me, signOut }) {
   const [projects, setProjects] = useState([]);
   const [tab, setTab] = useState("today");
 
+  const [viewDocs, setViewDocs] = useState(null);
+  const [viewHistory, setViewHistory] = useState(null);
+
   const load = async () => {
-    const [t, p] = await Promise.all([api.tasks("?mine=1"), api.projects()]);
-    setTasks(t.results || t); setProjects(p);
+    const [t, p] = await Promise.all([api.tasks("?mine=1&no_page=1"), api.projects("?no_page=1")]);
+    setTasks(t.results || t); setProjects(p.results || p);
   };
   useEffect(() => { load(); }, []);
 
@@ -1496,12 +1514,27 @@ function DevShell({ me, signOut }) {
         </div>
       </header>
 
-      {projects.filter(p => p.latest_update).map(p => (
-        <Card key={p.id} className="p-3.5 mb-3 bg-amber-50 border-amber-200">
-          <div className="f-disp text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-0.5 flex items-center gap-1"><Megaphone size={11} /> {p.name}</div>
-          <p className="text-sm text-amber-900">{p.latest_update.text}</p>
-        </Card>
-      ))}
+      <h2 className="f-disp text-sm font-bold mb-2 text-gray-700">My Projects</h2>
+      <div className="space-y-3 mb-6">
+        {projects.map(p => (
+          <Card key={p.id} className="p-3.5 bg-gray-50 border-gray-200 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="f-disp font-bold flex items-center gap-1"><FolderKanban size={13} className="text-gray-400" /> {p.name}</span>
+              <div className="flex gap-2">
+                <Btn small kind="outline" onClick={() => setViewDocs(p)}><FileText size={12} /> Docs</Btn>
+                <Btn small kind="outline" onClick={() => setViewHistory(p)}><Megaphone size={12} /> Updates</Btn>
+              </div>
+            </div>
+            {p.latest_update && (
+              <div className="bg-amber-50 p-2 rounded text-sm text-amber-900 border border-amber-100">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1 flex items-center gap-1"><Megaphone size={10}/> Latest Update</div>
+                {p.latest_update.text}
+              </div>
+            )}
+          </Card>
+        ))}
+        {projects.length === 0 && <p className="text-xs text-gray-500 italic">No active projects yet.</p>}
+      </div>
 
       <nav className="flex gap-1 mb-4 border-b border-gray-200">
         {[["today", `Today (${todayTasks.length})`], ["overdue", `Overdue (${overdue.length})`], ["upcoming", "Upcoming"], ["all", "Full plan"], ["adhoc", "My Tasks"]].map(([id, label]) => (
@@ -1516,6 +1549,15 @@ function DevShell({ me, signOut }) {
       {tab === "upcoming" && <Card>{upcoming.length ? upcoming.map(t => <DevRow key={t.id} t={t} showDate onToggle={toggle} setTasks={setTasks} tasks={tasks} />) : <div className="p-8 text-center text-sm text-gray-400">Nothing coming up yet.</div>}</Card>}
       {tab === "all" && <Card>{tasks.map(t => <DevRow key={t.id} t={t} showDate onToggle={toggle} setTasks={setTasks} tasks={tasks} />)}</Card>}
       {tab === "adhoc" && <AdHocTasksTab me={me} isAdmin={false} />}
+
+      {viewDocs && (
+        <Modal title={`Documents: ${viewDocs.name}`} onClose={() => setViewDocs(null)}>
+          <DocumentsView projectId={viewDocs.id} project={viewDocs} readOnly={true} />
+        </Modal>
+      )}
+      {viewHistory && (
+        <UpdateHistoryModal project={viewHistory} onClose={() => setViewHistory(null)} />
+      )}
     </div>
   );
 }
@@ -1576,8 +1618,28 @@ function DevRow({ t, showDate, onToggle, setTasks, tasks }) {
   );
 }
 
+function UpdateHistoryModal({ project, onClose }) {
+  const [updates, setUpdates] = useState(null);
+  useEffect(() => { api.updates(project.id).then(setUpdates); }, [project.id]);
+  return (
+    <Modal title={`Updates: ${project.name}`} onClose={onClose}>
+      {!updates ? <Spinner /> : (
+        <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+          {updates.map(u => (
+            <div key={u.id} className="border-l-2 border-amber-400 pl-3 py-1">
+              <div className="text-xs text-gray-500 mb-1">{fmtLong(u.created_at)}</div>
+              <p className="text-sm">{u.text}</p>
+            </div>
+          ))}
+          {updates.length === 0 && <p className="text-sm text-gray-400">No updates yet.</p>}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 /* ---------- Documents ---------- */
-function DocumentsView({ projectId, project }) {
+function DocumentsView({ projectId, project, readOnly }) {
   const [docs, setDocs] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -1626,12 +1688,14 @@ function DocumentsView({ projectId, project }) {
     <Card className="p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="f-disp font-bold text-lg">Project Documents</h2>
-        <div>
-          <input ref={fileRef} type="file" className="hidden" onChange={upload} />
-          <Btn small onClick={() => fileRef.current?.click()} disabled={busy}>
-            {busy ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />} Upload Document
-          </Btn>
-        </div>
+        {!readOnly && (
+          <div>
+            <input ref={fileRef} type="file" className="hidden" onChange={upload} />
+            <Btn small onClick={() => fileRef.current?.click()} disabled={busy}>
+              {busy ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />} Upload Document
+            </Btn>
+          </div>
+        )}
       </div>
       {err && <p className="text-xs text-red-600 mb-3">{err}</p>}
 
@@ -1663,7 +1727,7 @@ function DocumentsView({ projectId, project }) {
                 <a href={d.file_url} download target="_blank" rel="noreferrer" className="text-gray-400 hover:text-indigo-600 transition-colors p-2" title="Download">
                   <Download size={15} />
                 </a>
-                {!d.isSow && (
+                {!readOnly && !d.isSow && (
                   <button onClick={() => removeDoc(d.id, d.title)} className="text-gray-400 hover:text-red-600 transition-colors p-2" title="Delete">
                     <Trash2 size={15} />
                   </button>
