@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
-  Users, Briefcase, FolderKanban, LayoutDashboard, Plus, Trash2, ChevronRight,
+  Users, Briefcase, FolderKanban, LayoutDashboard, Plus, Trash2, ChevronRight, ChevronDown,
   CheckCircle2, Circle, FileText, Loader2, Mail, Copy, Download, ArrowLeft,
   RefreshCw, LogOut, X, AlertTriangle, Sparkles, BarChart3, Megaphone,
   SlidersHorizontal, Bot, MessageSquare, Paperclip, UploadCloud, Eye
@@ -204,8 +204,17 @@ function AdHocTaskRow({ t, isAdmin, onToggle, onComment, onDelete }) {
           {t.description && <p className="text-xs text-gray-600 mb-2">{t.description}</p>}
 
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500">
-            {isAdmin ? <span>Assignees: <b>{t.assignees_names}</b></span> : <span>From: <b>{t.created_by_name}</b></span>}
-            <span>Due: {t.due_date ? new Date(t.due_date).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
+            {isAdmin ? (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="mr-0.5">Assignees:</span>
+                {t.assignees_detail?.map(u => (
+                  <span key={u.id} className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide">
+                    {u.name}
+                  </span>
+                ))}
+              </div>
+            ) : <span>From: <b>{t.created_by_name}</b></span>}
+            <span className="flex items-center">Due: {t.due_date ? new Date(t.due_date).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
             {t.attachments?.length > 0 && (
               <div className="flex items-center gap-1">
                 <Paperclip size={10} />
@@ -251,6 +260,46 @@ function AdHocTaskRow({ t, isAdmin, onToggle, onComment, onDelete }) {
   );
 }
 
+function MultiSelectDropdown({ options, selected, onChange }) {
+  const [open, setOpen] = useState(false);
+  const selectedNames = options.filter(o => selected.includes(String(o.id))).map(o => o.name);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => { if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <div 
+        className="f-body w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white cursor-pointer flex justify-between items-center"
+        onClick={() => setOpen(!open)}
+      >
+        <div className="truncate text-gray-700 pr-2">
+          {selectedNames.length > 0 ? selectedNames.join(", ") : <span className="text-gray-400">Select assignees...</span>}
+        </div>
+        <ChevronDown size={14} className="text-gray-400 shrink-0" />
+      </div>
+      {open && (
+        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+          {options.map(t => (
+            <label key={t.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
+              <input type="checkbox" checked={selected.includes(String(t.id))} onChange={e => {
+                const checked = e.target.checked;
+                const idStr = String(t.id);
+                onChange(checked ? [...selected, idStr] : selected.filter(id => id !== idStr));
+              }} className="text-red-600 focus:ring-red-500 rounded border-gray-300" />
+              <span className="text-sm text-gray-800">{t.name}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NewAdHocTaskModal({ team, onClose, onSaved }) {
   const nowLocal = () => { const d = new Date(); d.setHours(18, 0, 0, 0); return d.toISOString().slice(0, 16); };
   const [form, setForm] = useState({ title: "", description: "", assignees: [String(team[0]?.id || "")], priority: "MEDIUM", due_date: nowLocal() });
@@ -289,21 +338,11 @@ function NewAdHocTaskModal({ team, onClose, onSaved }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Assignees *</Label>
-            <div className="f-body border border-gray-300 rounded-md p-1.5 text-sm bg-white max-h-[104px] overflow-y-auto flex flex-col">
-              {team.map(t => (
-                <label key={t.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
-                  <input type="checkbox" checked={form.assignees.includes(String(t.id))} onChange={e => {
-                    const checked = e.target.checked;
-                    const idStr = String(t.id);
-                    setForm(prev => ({
-                      ...prev,
-                      assignees: checked ? [...prev.assignees, idStr] : prev.assignees.filter(id => id !== idStr)
-                    }));
-                  }} className="text-red-600 focus:ring-red-500 rounded border-gray-300" />
-                  <span className="truncate">{t.name}</span>
-                </label>
-              ))}
-            </div>
+            <MultiSelectDropdown 
+              options={team} 
+              selected={form.assignees} 
+              onChange={assignees => setForm({ ...form, assignees })} 
+            />
           </div>
           <div>
             <Label>Priority</Label>
