@@ -3,7 +3,7 @@ import {
   Users, Briefcase, FolderKanban, LayoutDashboard, Plus, Trash2, ChevronRight, ChevronDown,
   CheckCircle2, Circle, FileText, Loader2, Mail, Copy, Download, ArrowLeft,
   RefreshCw, LogOut, X, AlertTriangle, Sparkles, BarChart3, Megaphone,
-  SlidersHorizontal, Bot, MessageSquare, Paperclip, UploadCloud, Eye
+  SlidersHorizontal, Bot, MessageSquare, Paperclip, UploadCloud, Eye, Pencil
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -1000,7 +1000,7 @@ function ProjectDetail({ projectId, onBack }) {
   const [modal, setModal] = useState(null); // summary | adjust | update
 
   const load = async () => {
-    const [p, t, u] = await Promise.all([api.project(projectId), api.tasks(`?project=${projectId}`), api.updates(projectId)]);
+    const [p, t, u] = await Promise.all([api.project(projectId), api.tasks(`?project=${projectId}&no_page=1`), api.updates(projectId)]);
     setProject(p); setTasks(t.results || t); setUpdates(u);
   };
   useEffect(() => { load(); }, [projectId]);
@@ -1039,6 +1039,7 @@ function ProjectDetail({ projectId, onBack }) {
         </div>
         <div className="flex flex-wrap gap-2 justify-end">
           <Btn kind="outline" small onClick={() => setModal("summary")}><Bot size={13} /> AI summary</Btn>
+          <Btn kind="outline" small onClick={() => setModal("edit")}><Pencil size={13} /> Edit details</Btn>
           <Btn kind="outline" small onClick={() => setModal("adjust")}><SlidersHorizontal size={13} /> Adjust plan (FDD change)</Btn>
           <Btn kind="outline" small onClick={() => setModal("update")}><Megaphone size={13} /> Post update</Btn>
           <Btn kind="danger" small onClick={removeProject}><Trash2 size={13} /></Btn>
@@ -1079,6 +1080,7 @@ function ProjectDetail({ projectId, onBack }) {
       {view === "docs" && <DocumentsView projectId={projectId} project={project} />}
 
       {modal === "summary" && <SummaryModal projectId={projectId} name={project.name} onClose={() => setModal(null)} />}
+      {modal === "edit" && <EditProjectModal project={project} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
       {modal === "adjust" && <AdjustModal projectId={projectId} onClose={() => setModal(null)} onApplied={() => { setModal(null); load(); }} />}
       {modal === "update" && <UpdateModal onClose={() => setModal(null)} onPost={async (text) => { await api.postUpdate(projectId, text); setModal(null); load(); }} />}
     </div>
@@ -1387,6 +1389,102 @@ function SummaryModal({ projectId, name, onClose }) {
               </Btn>
             </>
           )}
+    </Modal>
+  );
+}
+
+function EditProjectModal({ project, onClose, onSaved }) {
+  const [team, setTeam] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [form, setForm] = useState({
+    name: project.name || "",
+    client: project.client || "",
+    ref: project.ref || "",
+    start_date: project.start_date || todayISO(),
+    weeks: project.weeks || 8,
+  });
+  const [pdf, setPdf] = useState(null);
+  const [teamIds, setTeamIds] = useState(project.team_detail ? project.team_detail.map(t => t.id) : []);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    api.users().then(u => setTeam(u.filter(x => x.role !== "ADMIN")));
+    api.clients().then(setClients);
+  }, []);
+
+  const save = async () => {
+    setErr("");
+    if (!form.name.trim()) return setErr("Project name is required.");
+    if (!teamIds.length) return setErr("Select at least one team member.");
+    
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      Object.entries(form).forEach(([k, v]) => {
+        if (v !== null && v !== "") {
+          fd.append(k, v);
+        }
+      });
+      // Team requires special handling for lists
+      fd.append("team", teamIds.join(","));
+      if (pdf) fd.append("sow_pdf", pdf);
+
+      await api.updateProject(project.id, fd);
+      onSaved();
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title="Edit Project Details" onClose={onClose}>
+      <div className="space-y-4">
+        <div><Label>Project name</Label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} autoFocus /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Client</Label>
+            <select value={form.client} onChange={e => setForm({ ...form, client: e.target.value })} className="f-body w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm bg-white">
+              <option value="">— none —</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <Label>SOW / FDD document (optional)</Label>
+            <input ref={fileRef} type="file" accept=".pdf,.doc,.docx" className="hidden"
+              onChange={e => setPdf(e.target.files?.[0] || null)} />
+            <div className="flex items-center gap-2 mb-2 mt-1">
+              <Btn kind="outline" small onClick={() => fileRef.current?.click()}><FileText size={13} /> Upload New Document</Btn>
+              {pdf && <span className="text-xs text-gray-600 inline-flex items-center gap-1 max-w-[120px] truncate" title={pdf.name}>{pdf.name} <button onClick={() => setPdf(null)}><X size={12} className="text-gray-400 hover:text-red-500 shrink-0" /></button></span>}
+            </div>
+            {project.sow_pdf && !pdf && <a href={project.sow_pdf} target="_blank" rel="noreferrer" className="text-[11px] text-indigo-600 hover:underline inline-flex items-center gap-1"><Eye size={10} /> View current SOW</a>}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Label>Start date</Label><Input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} /></div>
+          <div><Label>Duration (weeks)</Label><Input type="number" min={1} max={16} value={form.weeks} onChange={e => setForm({ ...form, weeks: parseInt(e.target.value) || 1 })} /></div>
+        </div>
+        <div>
+          <Label>Team on this project</Label>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {team.map(t => (
+              <button key={t.id} onClick={() => setTeamIds(ids => ids.includes(t.id) ? ids.filter(x => x !== t.id) : [...ids, t.id])}
+                className={`f-disp text-xs font-semibold px-3 py-2 rounded-md border transition-colors ${teamIds.includes(t.id) ? "text-white border-transparent" : "border-gray-300 text-gray-600 hover:border-gray-400"}`}
+                style={teamIds.includes(t.id) ? { background: RED } : {}}>
+                {t.name}
+              </button>
+            ))}
+            {team.length === 0 && <span className="text-xs text-gray-500">Loading team...</span>}
+          </div>
+        </div>
+        {err && <p className="text-sm text-red-600 flex items-center gap-1.5"><AlertTriangle size={14} /> {err}</p>}
+        <div className="flex gap-2 pt-2">
+          <Btn onClick={save} disabled={busy}>{busy ? <Loader2 size={13} className="animate-spin" /> : "Save Changes"}</Btn>
+          <Btn kind="ghost" onClick={onClose}>Cancel</Btn>
+        </div>
+      </div>
     </Modal>
   );
 }
