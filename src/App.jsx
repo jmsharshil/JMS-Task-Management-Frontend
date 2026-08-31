@@ -750,7 +750,10 @@ function ProjectsTab({ onOpen }) {
             <div>
               <div className="f-disp font-bold">{p.name}</div>
               <div className="text-xs text-gray-500 mt-0.5">
-                {p.client_name || "—"} · {p.weeks} weeks · starts {fmt(p.start_date)} · Team: {p.team_detail.map(t => t.name).join(", ")} · {p.stats.pct}% done
+                {p.client_name || "—"} · {p.weeks} weeks · starts {fmt(p.start_date)} · 
+                Team: {p.team_detail.map(t => t.name).join(", ")}
+                {p.team_leaders_detail?.length > 0 && ` · Leaders: ${p.team_leaders_detail.map(t => t.name).join(", ")}`}
+                · {p.stats.pct}% done
               </div>
             </div>
             <ChevronRight size={16} className="text-gray-400" />
@@ -772,9 +775,12 @@ function NewProject({ onDone }) {
   const [team, setTeam] = useState([]); const [clients, setClients] = useState([]);
   const [form, setForm] = useState({ name: "", client: "", ref: "", start_date: todayISO(), weeks: 8, current_week: 1 });
   const [teamIds, setTeamIds] = useState([]);
+  const [leaderIds, setLeaderIds] = useState([]);
   const [docText, setDocText] = useState(""); const [pdf, setPdf] = useState(null);
   const [phase, setPhase] = useState("form"); const [err, setErr] = useState("");
   const [draft, setDraft] = useState(null);
+  const [architectureDraft, setArchitectureDraft] = useState(null);
+  const [architectureId, setArchitectureId] = useState(null);
   const [newClient, setNewClient] = useState({ show: false, name: "", contact: "", saving: false });
   const fileRef = useRef(null);
 
@@ -797,24 +803,70 @@ function NewProject({ onDone }) {
     }
   };
 
-  const generate = async () => {
+  const generateArchitecture = async () => {
     setErr("");
     if (!form.name.trim()) return setErr("Give the project a name.");
     if (!teamIds.length) return setErr("Select at least one developer.");
     if (!docText.trim() && !pdf) return setErr("Upload the SOW/FDD (PDF, DOC or DOCX) or paste its scope text.");
-    setPhase("generating");
+    setPhase("arch_generating");
+    try {
+      const fd = new FormData();
+      fd.append("name", form.name);
+      fd.append("start_date", form.start_date);
+      fd.append("weeks", form.weeks);
+      fd.append("team", teamIds.join(","));
+      if (leaderIds.length) fd.append("team_leaders", leaderIds.join(","));
+      if (docText.trim()) fd.append("doc_text", docText);
+      if (pdf) fd.append("sow_pdf", pdf);
+      const res = await api.generateArchitecture(fd);
+      setArchitectureDraft(res.architecture || res);
+      setDraft({ brief: res.brief || {} });
+      setPhase("arch_review");
+    } catch (e) { 
+      setErr(e.message || "Architecture generation failed"); 
+      setPhase("form"); 
+    }
+  };
+
+  const approveArchitecture = async (notes = "") => {
+    if (!architectureDraft) return;
+    setPhase("arch_approving");
+    try {
+      const fd = new FormData();
+      fd.append("name", form.name);
+      fd.append("architecture", JSON.stringify(architectureDraft));
+      if (notes) fd.append("notes", notes);
+      const res = await api.approveArchitecture(fd);
+      setArchitectureId(res.id);
+      setPhase("plan_generating");
+      // Auto proceed to plan generation
+      await generatePlanWithArch(res.id);
+    } catch (e) { 
+      setErr(e.message || "Approval failed"); 
+      setPhase("arch_review"); 
+    }
+  };
+
+  const generatePlanWithArch = async (archId) => {
     try {
       const fd = new FormData();
       fd.append("name", form.name); fd.append("start_date", form.start_date);
       fd.append("weeks", form.weeks); fd.append("team", teamIds.join(","));
+      if (leaderIds.length) fd.append("team_leaders", leaderIds.join(","));
+      fd.append("architecture_id", archId);
       if (docText.trim()) fd.append("doc_text", docText);
       if (pdf) fd.append("sow_pdf", pdf);
-      setDraft(await api.generatePlan(fd));
-      setPhase("review");
-    } catch (e) { setErr(e.message); setPhase("form"); }
+      const res = await api.generatePlan(fd);
+      setDraft(res);
+      setPhase("plan_review");
+    } catch (e) { 
+      setErr(e.message || "Plan generation failed"); 
+      setPhase("arch_review"); 
+    }
   };
 
   const save = async () => {
+    if (!architectureId) return setErr("Architecture must be approved first.");
     try {
       const fd = new FormData();
       fd.append("name", form.name);
@@ -823,8 +875,10 @@ function NewProject({ onDone }) {
       fd.append("weeks", form.weeks);
       fd.append("current_week", form.current_week);
       fd.append("team", teamIds.join(","));
-      fd.append("brief", JSON.stringify(draft.brief));
-      fd.append("rows", JSON.stringify(draft.rows));
+      if (leaderIds.length) fd.append("team_leaders", leaderIds.join(","));
+      fd.append("brief", JSON.stringify(draft.brief || {}));
+      fd.append("rows", JSON.stringify(draft.rows || []));
+      fd.append("architecture_id", architectureId);
       if (pdf) fd.append("sow_pdf", pdf);
 
       const p = await api.createProject(fd);
@@ -832,34 +886,121 @@ function NewProject({ onDone }) {
     } catch (e) { setErr(e.message); }
   };
 
-  if (phase === "generating") return (
+  const regenerateArch = () => {
+    setPhase("form");
+    setArchitectureDraft(null);
+    setArchitectureId(null);
+  };
+
+  if (phase === "arch_generating" || phase === "plan_generating" || phase === "arch_approving") return (
     <Card className="p-10 text-center">
       <Loader2 className="animate-spin mx-auto mb-4" size={28} style={{ color: RED }} />
-      <div className="f-disp font-bold text-lg mb-1">Building your plan</div>
-      <p className="text-sm text-gray-500">Reading the document and allocating one task per developer per working day. This can take a minute or two.</p>
+      <div className="f-disp font-bold text-lg mb-1">
+        {phase.includes("arch") ? "Generating Architecture Document" : "Building detailed plan"}
+      </div>
+      <p className="text-sm text-gray-500">
+        {phase === "arch_generating" 
+          ? "Analyzing SOW/FDD and producing technical architecture, diagrams, risks using GPT-4o-mini. Takes ~30s."
+          : phase === "arch_approving" 
+            ? "Saving approved architecture..."
+            : "Using approved architecture to create aligned weekly/daily tasks. This can take a minute."}
+      </p>
     </Card>
   );
-  if (phase === "review") return (
+
+  if (phase === "arch_review" && architectureDraft) return (
+    <div className="max-w-4xl">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div>
+          <h2 className="f-disp font-bold text-xl">Architecture Review — {form.name}</h2>
+          <p className="text-xs text-gray-500">Review the AI-generated architecture. Approve to unlock detailed plan generation.</p>
+        </div>
+        <div className="flex gap-2">
+          <Btn kind="ghost" onClick={regenerateArch}><RefreshCw size={14} /> Regenerate Architecture</Btn>
+          <Btn onClick={() => approveArchitecture("Approved as-is by admin.")}><CheckCircle2 size={15} /> Approve Architecture</Btn>
+        </div>
+      </div>
+      {err && <p className="text-sm text-red-600 mb-4 p-3 bg-red-50 border border-red-200 rounded">{err}</p>}
+
+      <Card className="p-6 mb-6">
+        <div className="prose text-sm">
+          <h3 className="f-disp font-bold text-lg border-b pb-2 mb-4">Overview</h3>
+          <p className="whitespace-pre-wrap text-gray-700">{architectureDraft.overview || "No overview provided."}</p>
+
+          <h3 className="f-disp font-bold text-lg border-b pb-2 mt-8 mb-3">Tech Stack</h3>
+          <div className="flex flex-wrap gap-2">
+            {(architectureDraft.tech_stack || []).map((tech, i) => (
+              <span key={i} className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">{tech}</span>
+            ))}
+          </div>
+
+          <h3 className="f-disp font-bold text-lg border-b pb-2 mt-8 mb-3">Key Components</h3>
+          <ul className="list-disc pl-5 space-y-2">
+            {(architectureDraft.key_components || []).map((comp, i) => (
+              <li key={i} className="text-gray-700">{typeof comp === 'string' ? comp : JSON.stringify(comp)}</li>
+            ))}
+          </ul>
+
+          <h3 className="f-disp font-bold text-lg border-b pb-2 mt-8 mb-3">Data Flow & Integrations</h3>
+          <p className="whitespace-pre-wrap text-gray-700">{architectureDraft.data_flow || "—"}</p>
+
+          <h3 className="f-disp font-bold text-lg border-b pb-2 mt-8 mb-3">Mermaid Diagrams</h3>
+          <div className="grid grid-cols-1 gap-6">
+            {architectureDraft.mermaid_diagrams && typeof architectureDraft.mermaid_diagrams === 'object' && (
+              Object.entries(architectureDraft.mermaid_diagrams).map(([type, diagram]) => (
+                <div key={type}>
+                  <div className="font-mono text-xs bg-gray-100 p-2 rounded mb-1">{type.toUpperCase()} DIAGRAM</div>
+                  <pre className="bg-gray-900 text-green-400 p-4 rounded text-xs overflow-auto font-mono leading-tight whitespace-pre">{diagram}</pre>
+                </div>
+              ))
+            )}
+          </div>
+
+          <h3 className="f-disp font-bold text-lg border-b pb-2 mt-8 mb-3">Non-Functional Requirements</h3>
+          <ul className="list-disc pl-5 space-y-1 text-gray-700">
+            {(architectureDraft.non_functional || []).map((item, i) => <li key={i}>{item}</li>)}
+          </ul>
+
+          <h3 className="f-disp font-bold text-lg border-b pb-2 mt-8 mb-3">Risks & Assumptions</h3>
+          <ul className="list-disc pl-5 space-y-1 text-gray-700">
+            {(architectureDraft.risks_assumptions || []).map((item, i) => <li key={i}>{item}</li>)}
+          </ul>
+
+          <h3 className="f-disp font-bold text-lg border-b pb-2 mt-8 mb-3">Implementation Approach</h3>
+          <p className="whitespace-pre-wrap text-gray-700">{architectureDraft.implementation_approach || "—"}</p>
+        </div>
+      </Card>
+
+      <div className="flex gap-3 justify-end">
+        <Btn kind="ghost" onClick={() => { setPhase("form"); setErr(""); }}>Back to Form</Btn>
+        <Btn onClick={() => approveArchitecture("")}>Approve & Generate Plan</Btn>
+      </div>
+      <p className="text-[10px] text-gray-400 mt-6 text-center">This architecture document is stored with the project for future reference and alignment.</p>
+    </div>
+  );
+
+  if (phase === "plan_review") return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <h2 className="f-disp font-bold text-lg">Review the generated plan</h2>
-          <p className="text-xs text-gray-500">{draft.rows.length} tasks · edit any task or reassign it before publishing. Team is emailed on save.</p>
+          <h2 className="f-disp font-bold text-lg">Review Generated Plan (Aligned to Approved Architecture)</h2>
+          <p className="text-xs text-gray-500">{(draft.rows || []).length} tasks · Architecture ID: {architectureId}. Edit before publishing.</p>
         </div>
         <div className="flex gap-2">
-          <Btn kind="ghost" onClick={generate}><RefreshCw size={14} /> Regenerate</Btn>
-          <Btn onClick={save}><CheckCircle2 size={15} /> Save & publish to team</Btn>
+          <Btn kind="ghost" onClick={() => generatePlanWithArch(architectureId)}><RefreshCw size={14} /> Regenerate Plan</Btn>
+          <Btn onClick={save}><CheckCircle2 size={15} /> Save &amp; Publish to Team</Btn>
         </div>
       </div>
       {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
-      <DraftTable rows={draft.rows} team={team.filter(t => teamIds.includes(t.id))}
+      <DraftTable rows={draft.rows || []} team={team.filter(t => teamIds.includes(t.id))}
         onChange={(rows) => setDraft({ ...draft, rows })} />
     </div>
   );
+
   return (
     <Card className="p-6 max-w-2xl">
-      <h2 className="f-disp font-bold text-lg mb-1">New project</h2>
-      <p className="text-xs text-gray-500 mb-5">Upload the SOW / FDD, pick the team and timeline — the day-wise plan is generated for you.</p>
+      <h2 className="f-disp font-bold text-lg mb-1">New Project — Two Stage Gated Workflow</h2>
+      <p className="text-xs text-gray-500 mb-5">1. Generate &amp; approve architecture from SOW/FDD. 2. Generate aligned plan. Hard gate enforced.</p>
       <div className="space-y-4">
         <div><Label>Project name</Label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Knowcraft LMS" /></div>
         <div className="grid grid-cols-2 gap-3">
@@ -923,6 +1064,34 @@ function NewProject({ onDone }) {
           </div>
         </div>
         <div>
+          <Label>Project Managers / Leaders <span className="text-[10px] text-emerald-600 font-normal">(subset of team — AI gives them coordination, reviews, complex modules bias)</span></Label>
+          <div className="flex flex-wrap gap-2">
+            {team
+              .filter(t => teamIds.includes(t.id))
+              .map(t => {
+                const isSuggestedManager = (t.designation || "").toLowerCase().includes("manager") || 
+                                          (t.designation || "").toLowerCase().includes("lead");
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setLeaderIds(ids =>
+                      ids.includes(t.id)
+                        ? ids.filter(x => x !== t.id)
+                        : [...ids, t.id]
+                    )}
+                    className={`f-disp text-xs font-semibold px-3 py-2 rounded-md border transition-colors ${leaderIds.includes(t.id) ? "text-white border-transparent" : isSuggestedManager ? "border-emerald-300 text-emerald-700 hover:border-emerald-500 bg-emerald-50" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
+                    style={leaderIds.includes(t.id) ? { background: "#178A50" } : {}}
+                    title={isSuggestedManager ? "Suggested (contains 'Manager'/'Lead' in designation)" : ""}
+                  >
+                    {t.name} {isSuggestedManager && "👔"}
+                  </button>
+                );
+              })}
+            {teamIds.length === 0 && <p className="text-xs text-gray-400 italic">Select team members first.</p>}
+          </div>
+          <p className="text-[10px] text-gray-500 mt-1">Project Managers/Leads get explicit bias in the architecture &amp; planning prompts. They are a subset of the selected team.</p>
+        </div>
+        <div>
           <Label>SOW / FDD document</Label>
           <input ref={fileRef} type="file" accept=".pdf,.doc,.docx" className="hidden"
             onChange={e => setPdf(e.target.files?.[0] || null)} />
@@ -936,9 +1105,10 @@ function NewProject({ onDone }) {
         </div>
         {err && <p className="text-sm text-red-600 flex items-center gap-1.5"><AlertTriangle size={14} /> {err}</p>}
         <div className="flex gap-2">
-          <Btn onClick={generate}><Sparkles size={15} /> Generate day-wise plan</Btn>
+          <Btn onClick={generateArchitecture}><Sparkles size={15} /> Generate Architecture (Step 1)</Btn>
           <Btn kind="ghost" onClick={() => onDone(null)}>Cancel</Btn>
         </div>
+        <div className="text-[10px] text-amber-600 pt-2 border-t">Backend now enforces approved architecture before plan or project creation.</div>
       </div>
     </Card>
   );
@@ -1033,7 +1203,12 @@ function ProjectDetail({ projectId, onBack }) {
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div className="rail pl-4">
           <h2 className="f-disp font-bold text-xl">{project.name}</h2>
-          <p className="text-xs text-gray-500">{project.client_name || "—"} {project.ref ? `· ${project.ref}` : ""} · {fmtLong(project.start_date)} · {project.weeks} weeks</p>
+          <p className="text-xs text-gray-500">
+            {project.client_name || "—"} {project.ref ? `· ${project.ref}` : ""} · {fmtLong(project.start_date)} · {project.weeks} weeks
+            {project.team_leaders_detail?.length > 0 && (
+              <> · <span className="text-emerald-700">Leaders: {project.team_leaders_detail.map(l => l.name).join(", ")}</span></>
+            )}
+          </p>
           <div className="w-48 mt-2"><ProgressBar pct={stats.pct} /></div>
           <p className="text-xs text-gray-400 mt-1">{stats.done}/{stats.total} tasks · {stats.pct}% complete</p>
         </div>
@@ -1059,6 +1234,11 @@ function ProjectDetail({ projectId, onBack }) {
         <Btn kind={view === "report" ? "primary" : "ghost"} small onClick={() => setView("report")}><Mail size={13} /> Weekly report</Btn>
         <Btn kind={view === "daily_report" ? "primary" : "ghost"} small onClick={() => setView("daily_report")}><Mail size={13} /> Daily report</Btn>
         <Btn kind={view === "docs" ? "primary" : "ghost"} small onClick={() => setView("docs")}><Paperclip size={13} /> Documents</Btn>
+        {project.architecture && (
+          <Btn kind={view === "architecture" ? "primary" : "ghost"} small onClick={() => setView("architecture")}>
+            <FileText size={13} /> Architecture
+          </Btn>
+        )}
       </div>
 
       {view === "plan" && (
@@ -1078,6 +1258,7 @@ function ProjectDetail({ projectId, onBack }) {
       {view === "report" && <WeeklyReport projectId={projectId} project={project} tasks={tasks} />}
       {view === "daily_report" && <DailyReport projectId={projectId} project={project} tasks={tasks} />}
       {view === "docs" && <DocumentsView projectId={projectId} project={project} />}
+      {view === "architecture" && project.architecture && <ArchitectureView architecture={project.architecture} projectName={project.name} />}
 
       {modal === "summary" && <SummaryModal projectId={projectId} name={project.name} onClose={() => setModal(null)} />}
       {modal === "edit" && <EditProjectModal project={project} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
@@ -1405,6 +1586,7 @@ function EditProjectModal({ project, onClose, onSaved }) {
   });
   const [pdf, setPdf] = useState(null);
   const [teamIds, setTeamIds] = useState(project.team_detail ? project.team_detail.map(t => t.id) : []);
+  const [leaderIds, setLeaderIds] = useState(project.team_leaders_detail ? project.team_leaders_detail.map(t => t.id) : []);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const fileRef = useRef(null);
@@ -1429,6 +1611,7 @@ function EditProjectModal({ project, onClose, onSaved }) {
       });
       // Team requires special handling for lists
       fd.append("team", teamIds.join(","));
+      if (leaderIds.length) fd.append("team_leaders", leaderIds.join(","));
       if (pdf) fd.append("sow_pdf", pdf);
 
       await api.updateProject(project.id, fd);
@@ -1478,6 +1661,33 @@ function EditProjectModal({ project, onClose, onSaved }) {
             ))}
             {team.length === 0 && <span className="text-xs text-gray-500">Loading team...</span>}
           </div>
+        </div>
+        <div>
+          <Label>Project Managers / Leaders <span className="text-[10px] text-emerald-600 font-normal">(subset of team — AI bias for coordination/reviews)</span></Label>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {team
+              .filter(t => teamIds.includes(t.id))
+              .map(t => {
+                const isSuggestedManager = (t.designation || "").toLowerCase().includes("manager") || 
+                                          (t.designation || "").toLowerCase().includes("lead");
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setLeaderIds(ids =>
+                      ids.includes(t.id)
+                        ? ids.filter(x => x !== t.id)
+                        : [...ids, t.id]
+                    )}
+                    className={`f-disp text-xs font-semibold px-3 py-2 rounded-md border transition-colors ${leaderIds.includes(t.id) ? "text-white border-transparent" : isSuggestedManager ? "border-emerald-300 text-emerald-700 hover:border-emerald-500 bg-emerald-50" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
+                    style={leaderIds.includes(t.id) ? { background: "#178A50" } : {}}
+                    title={isSuggestedManager ? "Suggested Project Manager/Lead" : ""}
+                  >
+                    {t.name} {isSuggestedManager && "👔"}
+                  </button>
+                );
+              })}
+          </div>
+          <p className="text-[10px] text-gray-500 mt-1">Project Managers (or Leads) get explicit bias in AI prompts for architecture alignment, reviews, and complex tasks. Must be subset of selected team.</p>
         </div>
         {err && <p className="text-sm text-red-600 flex items-center gap-1.5"><AlertTriangle size={14} /> {err}</p>}
         <div className="flex gap-2 pt-2">
@@ -1833,6 +2043,125 @@ function DocumentsView({ projectId, project, readOnly }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/* ---------- Architecture View (for approved architecture) ---------- */
+function ArchitectureView({ architecture, projectName }) {
+  const content = architecture.content || {};
+  const status = architecture.status || "APPROVED";
+  const approvedBy = architecture.approved_by_name || "Admin";
+  const approvedAt = architecture.approved_at ? new Date(architecture.approved_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "";
+
+  return (
+    <Card className="p-6">
+      <div className="flex items-center justify-between mb-6 border-b pb-4">
+        <div>
+          <h2 className="f-disp font-bold text-xl">Architecture for {projectName}</h2>
+          <div className="flex items-center gap-3 text-xs mt-1">
+            <span className={`px-3 py-0.5 rounded-full font-semibold ${status === "APPROVED" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+              {status}
+            </span>
+            {approvedAt && <span className="text-gray-500">Approved by {approvedBy} on {approvedAt}</span>}
+          </div>
+        </div>
+        <div className="text-xs text-gray-400">ID: {architecture.id} · v{architecture.version || 1}</div>
+      </div>
+
+      <div className="prose max-w-none text-sm">
+        <h3 className="f-disp font-bold text-lg mb-2 border-b pb-1">Overview</h3>
+        <p className="text-gray-700 leading-relaxed whitespace-pre-wrap mb-8">{content.overview || "No overview available."}</p>
+
+        {content.tech_stack && content.tech_stack.length > 0 && (
+          <>
+            <h3 className="f-disp font-bold text-lg mb-3">Tech Stack</h3>
+            <div className="flex flex-wrap gap-2 mb-8">
+              {content.tech_stack.map((item, i) => (
+                <span key={i} className="inline-block px-4 py-1 bg-indigo-50 text-indigo-700 text-xs rounded-full font-medium border border-indigo-100">
+                  {item}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
+
+        {content.key_components && content.key_components.length > 0 && (
+          <>
+            <h3 className="f-disp font-bold text-lg mb-3">Key Components</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+              {content.key_components.map((comp, i) => (
+                <div key={i} className="border border-gray-200 rounded p-4">
+                  <div className="font-semibold text-red-600 text-sm mb-1">Component {i+1}</div>
+                  <p className="text-gray-700 text-sm">{typeof comp === "string" ? comp : JSON.stringify(comp)}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {content.mermaid_diagrams && (
+          <>
+            <h3 className="f-disp font-bold text-lg mb-3">Architecture Diagrams (Mermaid)</h3>
+            <div className="space-y-8 mb-8">
+              {Object.entries(content.mermaid_diagrams).map(([key, diagram]) => (
+                <div key={key}>
+                  <div className="uppercase text-[10px] font-bold tracking-widest text-gray-400 mb-2">{key.replace("_", " ")}</div>
+                  <pre className="bg-zinc-950 text-emerald-300 p-5 rounded-lg text-xs font-mono overflow-auto leading-tight border border-zinc-800 relative group">
+                    {diagram}
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(diagram); }}
+                      className="absolute top-2 right-2 px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] text-emerald-400 rounded opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      Copy
+                    </button>
+                  </pre>
+                  <p className="text-[10px] text-gray-400 mt-1">Copy the Mermaid code above (button added) and paste into <a href="https://mermaid.live" target="_blank" className="underline">mermaid.live</a> to visualize.</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {content.data_flow && (
+          <>
+            <h3 className="f-disp font-bold text-lg mb-2 border-b pb-1">Data Flow &amp; Integrations</h3>
+            <p className="text-gray-700 whitespace-pre-wrap mb-8">{content.data_flow}</p>
+          </>
+        )}
+
+        {content.non_functional && content.non_functional.length > 0 && (
+          <>
+            <h3 className="f-disp font-bold text-lg mb-3">Non-Functional Requirements</h3>
+            <ul className="list-disc pl-6 space-y-2 mb-8 text-gray-700">
+              {content.non_functional.map((item, i) => <li key={i}>{item}</li>)}
+            </ul>
+          </>
+        )}
+
+        {content.risks_assumptions && content.risks_assumptions.length > 0 && (
+          <>
+            <h3 className="f-disp font-bold text-lg mb-3">Risks &amp; Assumptions</h3>
+            <ul className="list-disc pl-6 space-y-2 mb-8 text-gray-700">
+              {content.risks_assumptions.map((item, i) => <li key={i}>{item}</li>)}
+            </ul>
+          </>
+        )}
+
+        {content.implementation_approach && (
+          <>
+            <h3 className="f-disp font-bold text-lg mb-2 border-b pb-1">Implementation Approach</h3>
+            <p className="text-gray-700 whitespace-pre-wrap">{content.implementation_approach}</p>
+          </>
+        )}
+      </div>
+
+      {architecture.notes && (
+        <div className="mt-10 p-4 bg-amber-50 border border-amber-200 rounded">
+          <div className="text-xs font-bold text-amber-700 mb-1">APPROVAL NOTES</div>
+          <p className="text-sm text-amber-800">{architecture.notes}</p>
         </div>
       )}
     </Card>

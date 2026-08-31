@@ -48,6 +48,8 @@ export const api = {
   deleteProject: (id) => request(`/projects/${id}/`, { method: "DELETE" }),
   updateProject: (id, formData) => request(`/projects/${id}/`, { method: "PATCH", body: formData, form: true }),
   adjust: (id, formData) => request(`/projects/${id}/adjust/`, { method: "POST", body: formData, form: true }),
+  generateArchitecture: (formData) => request("/projects/generate-architecture/", { method: "POST", body: formData, form: true }),
+  approveArchitecture: (formData) => request("/projects/approve-architecture/", { method: "POST", body: formData, form: true }),
   report: (id, week) => request(`/projects/${id}/report/?week=${week}`),
   emailReport: (id, week) => request(`/projects/${id}/report/email/`, { method: "POST", body: { week } }),
   summary: (id) => request(`/projects/${id}/summary/`),
