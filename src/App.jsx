@@ -1,10 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import {
-  Users, Briefcase, FolderKanban, LayoutDashboard, Plus, Trash2, ChevronRight, ChevronDown,
-  CheckCircle2, Circle, FileText, Loader2, Mail, Copy, Download, ArrowLeft,
-  RefreshCw, LogOut, X, AlertTriangle, Sparkles, BarChart3, Megaphone,
-  SlidersHorizontal, Bot, MessageSquare, Paperclip, UploadCloud, Eye, Pencil
-} from "lucide-react";
+import { Users, Briefcase, FolderKanban, LayoutDashboard, Plus, Trash2, ChevronRight, ChevronDown, CheckCircle2, Circle, FileText, Loader2, Mail, Copy, Download, ArrowLeft, RefreshCw, LogOut, X, AlertTriangle, Sparkles, BarChart3, Megaphone, SlidersHorizontal, Bot, MessageSquare, Paperclip, UploadCloud, Eye, Pencil, Link2, Settings } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend
@@ -279,7 +274,7 @@ function MultiSelectDropdown({ options, selected, onChange }) {
 
   return (
     <div className="relative" ref={containerRef}>
-      <div 
+      <div
         className="f-body w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white cursor-pointer flex justify-between items-center"
         onClick={() => setOpen(!open)}
       >
@@ -344,10 +339,10 @@ function NewAdHocTaskModal({ team, onClose, onSaved }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Assignees *</Label>
-            <MultiSelectDropdown 
-              options={team} 
-              selected={form.assignees} 
-              onChange={assignees => setForm({ ...form, assignees })} 
+            <MultiSelectDropdown
+              options={team}
+              selected={form.assignees}
+              onChange={assignees => setForm({ ...form, assignees })}
             />
           </div>
           <div>
@@ -443,6 +438,7 @@ function AdminShell({ me, signOut }) {
     { id: "clients", label: "Clients", icon: Briefcase },
   ];
   const [showChangePwd, setShowChangePwd] = useState(false);
+  const [showOrgSettings, setShowOrgSettings] = useState(false);
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <header className="flex items-center justify-between mb-6">
@@ -454,14 +450,16 @@ function AdminShell({ me, signOut }) {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {me?.is_admin && <button onClick={() => setShowOrgSettings(true)} className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1"><Settings size={13} /> Org Settings</button>}
           <button onClick={() => setShowChangePwd(true)} className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1" title="Change password">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="16" r="1" /><rect x="3" y="10" width="18" height="12" rx="2" /><path d="M7 10V7a5 5 0 0 1 10 0v3" /></svg>
             Change Password
           </button>
           <button onClick={signOut} className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1"><LogOut size={13} /> Sign out</button>
         </div>
       </header>
       {showChangePwd && <ChangePasswordModal onClose={() => setShowChangePwd(false)} />}
+      {showOrgSettings && <OrgSettingsModal onClose={() => setShowOrgSettings(false)} />}
       <nav className="flex gap-1 mb-6 border-b border-gray-200">
         {tabs.map(t => (
           <button key={t.id} onClick={() => { setTab(t.id); setOpenId(null); }}
@@ -674,7 +672,7 @@ function TeamTab() {
               {t.role !== "ADMIN" && (
                 <div className="flex gap-2">
                   <button onClick={() => setResetTarget(t)} className="text-gray-300 hover:text-indigo-500" title="Reset password">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="16" r="1" /><rect x="3" y="10" width="18" height="12" rx="2" /><path d="M7 10V7a5 5 0 0 1 10 0v3" /></svg>
                   </button>
                   <button onClick={async () => { if (confirm(`Remove ${t.name}?`)) { await api.delUser(t.id); load(); } }}
                     className="text-gray-300 hover:text-red-500"><Trash2 size={15} /></button>
@@ -735,7 +733,7 @@ function ProjectsTab({ onOpen }) {
 
   if (creating) return <NewProject onDone={(p) => { setCreating(false); load(); if (p) onOpen(p.id); }} />;
   if (!data) return <Spinner text="Loading projects…" />;
-  
+
   const projects = data.results || data;
 
   return (
@@ -750,7 +748,7 @@ function ProjectsTab({ onOpen }) {
             <div>
               <div className="f-disp font-bold">{p.name}</div>
               <div className="text-xs text-gray-500 mt-0.5">
-                {p.client_name || "—"} · {p.weeks} weeks · starts {fmt(p.start_date)} · 
+                {p.client_name || "—"} · {p.weeks} weeks · starts {fmt(p.start_date)} ·
                 Team: {p.team_detail.map(t => t.name).join(", ")}
                 {p.team_leaders_detail?.length > 0 && ` · Leaders: ${p.team_leaders_detail.map(t => t.name).join(", ")}`}
                 · {p.stats.pct}% done
@@ -822,9 +820,9 @@ function NewProject({ onDone }) {
       setArchitectureDraft(res.architecture || res);
       setDraft({ brief: res.brief || {} });
       setPhase("arch_review");
-    } catch (e) { 
-      setErr(e.message || "Architecture generation failed"); 
-      setPhase("form"); 
+    } catch (e) {
+      setErr(e.message || "Architecture generation failed");
+      setPhase("form");
     }
   };
 
@@ -841,9 +839,9 @@ function NewProject({ onDone }) {
       setPhase("plan_generating");
       // Auto proceed to plan generation
       await generatePlanWithArch(res.id);
-    } catch (e) { 
-      setErr(e.message || "Approval failed"); 
-      setPhase("arch_review"); 
+    } catch (e) {
+      setErr(e.message || "Approval failed");
+      setPhase("arch_review");
     }
   };
 
@@ -859,9 +857,9 @@ function NewProject({ onDone }) {
       const res = await api.generatePlan(fd);
       setDraft(res);
       setPhase("plan_review");
-    } catch (e) { 
-      setErr(e.message || "Plan generation failed"); 
-      setPhase("arch_review"); 
+    } catch (e) {
+      setErr(e.message || "Plan generation failed");
+      setPhase("arch_review");
     }
   };
 
@@ -899,9 +897,9 @@ function NewProject({ onDone }) {
         {phase.includes("arch") ? "Generating Architecture Document" : "Building detailed plan"}
       </div>
       <p className="text-sm text-gray-500">
-        {phase === "arch_generating" 
+        {phase === "arch_generating"
           ? "Analyzing SOW/FDD and producing technical architecture, diagrams, risks using GPT-4o-mini. Takes ~30s."
-          : phase === "arch_approving" 
+          : phase === "arch_approving"
             ? "Saving approved architecture..."
             : "Using approved architecture to create aligned weekly/daily tasks. This can take a minute."}
       </p>
@@ -1069,8 +1067,8 @@ function NewProject({ onDone }) {
             {team
               .filter(t => teamIds.includes(t.id))
               .map(t => {
-                const isSuggestedManager = (t.designation || "").toLowerCase().includes("manager") || 
-                                          (t.designation || "").toLowerCase().includes("lead");
+                const isSuggestedManager = (t.designation || "").toLowerCase().includes("manager") ||
+                  (t.designation || "").toLowerCase().includes("lead");
                 return (
                   <button
                     key={t.id}
@@ -1160,6 +1158,296 @@ function DraftTable({ rows, team, onChange }) {
   );
 }
 
+
+/* ---------- Custom Range Report ---------- */
+function CustomRangeReport({ projectId, project }) {
+  const [fromDate, setFromDate] = useState(todayISO());
+  const [toDate, setToDate] = useState(todayISO());
+  const [reportText, setReportText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [emailTags, setEmailTags] = useState([]);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [sharedLink, setSharedLink] = useState(null);
+
+  const fetchReport = async () => {
+    setLoading(true);
+    try {
+      const data = await api.customReport(projectId, fromDate, toDate);
+      setReportText(data.text);
+    } catch (e) { alert(e.message); }
+    setLoading(false);
+  };
+
+  const handleEmail = async () => {
+    setSending(true);
+    try {
+      await api.emailCustomReport(projectId, fromDate, toDate, emailTags.join(","), reportText);
+      setSent(true); setTimeout(() => setSent(false), 2500);
+    } catch (e) { alert(e.message); }
+    setSending(false);
+  };
+
+  const handlePdf = async () => {
+    setPdfBusy(true);
+    try {
+      await api.customReportPdf(projectId, fromDate, toDate, project.name, reportText);
+    } catch (e) { alert(e.message); }
+    setPdfBusy(false);
+  };
+
+  return (
+    <div className="space-y-4 max-w-4xl">
+      <Card className="p-4 flex flex-wrap gap-4 items-end bg-gray-50 border-gray-200">
+        <div><Label>From Date</Label><Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></div>
+        <div><Label>To Date</Label><Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></div>
+        <Btn onClick={fetchReport} disabled={loading}>{loading ? "Generating…" : "Generate Report"}</Btn>
+      </Card>
+      {reportText && (
+        <Card className="p-5">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="f-disp font-bold text-lg text-indigo-900 flex items-center gap-2">
+              <Sparkles size={18} className="text-indigo-500" /> Task Report
+            </h3>
+            <Btn kind="outline" small onClick={async () => {
+              setPdfBusy(true);
+              try {
+                const { link } = await api.shareLink(projectId, { type: "custom", date_from: fromDate, date_to: toDate });
+                setSharedLink(link);
+              } catch (e) { alert(e.message); }
+              setPdfBusy(false);
+            }} disabled={pdfBusy}><Link2 size={13} /> Get Link</Btn>
+            <Btn kind="outline" small onClick={handlePdf} disabled={pdfBusy}>
+              {pdfBusy ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Download PDF
+            </Btn>
+          </div>
+          <p className="text-[11px] text-gray-500 mb-3 font-medium">✏️ Edit the report text below before emailing or downloading as PDF.</p>
+          <textarea
+            className="w-full text-xs text-gray-700 leading-relaxed font-mono bg-gray-50 p-4 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-y"
+            rows={16}
+            value={reportText}
+            onChange={(e) => setReportText(e.target.value)}
+          />
+          <div className="mt-4 space-y-2">
+            <Label>Email Recipients</Label>
+            <EmailTagInput tags={emailTags} setTags={setEmailTags} placeholder="Type email and press Enter or comma…" />
+            <div className="flex justify-end">
+              <Btn small onClick={handleEmail} disabled={sending}>
+                <Mail size={13} /> {sending ? "Sending…" : sent ? "Sent! ✓" : "Send Report Email"}
+              </Btn>
+            </div>
+          </div>
+          {sharedLink && <ShareLinkModal link={sharedLink} onClose={() => setSharedLink(null)} />}
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/* ---------- MOMs View ---------- */
+function MomsView({ projectId, project }) {
+  const [moms, setMoms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showNew, setShowNew] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try { setMoms(await api.moms(projectId)); } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, [projectId]);
+
+  const handleEmail = async (id) => {
+    const email = prompt("Enter recipient emails (comma-separated, leave blank for admin):");
+    if (email === null) return;
+    try {
+      await api.emailMom(projectId, id, email);
+      alert("MOM queued for emailing!");
+    } catch (e) { alert(e.message); }
+  };
+  const handlePdf = async (id, title) => {
+    try { await api.momPdf(projectId, id, title); } catch (e) { alert(e.message); }
+  };
+  const handleDel = async (id) => {
+    if (!confirm("Delete this MOM?")) return;
+    await api.deleteMom(projectId, id);
+    load();
+  };
+
+  if (loading) return <Spinner text="Loading MOMs..." />;
+
+  return (
+    <div className="space-y-4 max-w-4xl">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="f-disp font-bold">Minutes of Meeting</h3>
+        <Btn small onClick={() => setShowNew(true)}><Plus size={14} /> Add MOM</Btn>
+      </div>
+      {moms.length === 0 ? (
+        <div className="text-center p-8 text-gray-500 bg-gray-50 rounded-lg border border-gray-200 border-dashed">No MOMs recorded yet.</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {moms.map(m => (
+            <Card key={m.id} className="p-4 flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-bold text-sm text-gray-900">{m.title}</h4>
+                  <div className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded uppercase tracking-wide">{fmt(m.meeting_date)}</div>
+                </div>
+                <p className="text-xs text-gray-500 mb-1"><strong>Attendees:</strong> {m.attendees || "—"}</p>
+                <div className="text-xs text-gray-700 line-clamp-3 mb-3 bg-yellow-50 p-2 rounded">{m.discussion || "No discussion recorded."}</div>
+              </div>
+              <div className="flex justify-between items-center border-t border-gray-100 pt-3 mt-auto">
+                <span className="text-[10px] text-gray-400">By {m.created_by_name}</span>
+                <div className="flex gap-1">
+                  <button onClick={() => handleEmail(m.id)} title="Email" className="p-1.5 text-gray-400 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 rounded"><Mail size={13} /></button>
+                  <button onClick={() => handlePdf(m.id, m.title)} title="Download PDF" className="p-1.5 text-gray-400 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 rounded"><Download size={13} /></button>
+                  <button onClick={() => handleDel(m.id)} title="Delete" className="p-1.5 text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 rounded"><Trash2 size={13} /></button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+      {showNew && <NewMomModal projectId={projectId} onClose={() => setShowNew(false)} onSaved={() => { setShowNew(false); load(); }} />}
+    </div>
+  );
+}
+
+function NewMomModal({ projectId, onClose, onSaved }) {
+  const [data, setData] = useState({ title: "", meeting_date: todayISO(), meeting_time: "", attendees: "", agenda: "", discussion: "", decisions: "", action_items: "", next_meeting_date: "", next_meeting_time: "" });
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (!data.title || !data.meeting_date) return alert("Title and date required.");
+    setSaving(true);
+    try {
+      await api.createMom(projectId, {
+        ...data,
+        next_meeting_date: data.next_meeting_date || null,
+        meeting_time: data.meeting_time || null,
+        next_meeting_time: data.next_meeting_time || null
+      });
+      onSaved();
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+  return (
+    <Modal title="Record Minutes of Meeting" onClose={onClose} wide>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="col-span-2"><Label>Meeting Title</Label><Input value={data.title} onChange={e => setData({ ...data, title: e.target.value })} autoFocus /></div>
+        <div className="flex gap-2">
+          <div className="flex-1"><Label>Date</Label><Input type="date" value={data.meeting_date} onChange={e => setData({ ...data, meeting_date: e.target.value })} /></div>
+          <div className="flex-1"><Label>Time</Label><Input type="time" value={data.meeting_time} onChange={e => setData({ ...data, meeting_time: e.target.value })} /></div>
+        </div>
+        <div className="flex gap-2">
+          <div className="flex-1"><Label>Next Meeting Date (optional)</Label><Input type="date" value={data.next_meeting_date} onChange={e => setData({ ...data, next_meeting_date: e.target.value })} /></div>
+          <div className="flex-1"><Label>Next Meeting Time</Label><Input type="time" value={data.next_meeting_time} onChange={e => setData({ ...data, next_meeting_time: e.target.value })} /></div>
+        </div>
+        <div className="col-span-2"><Label>Attendees</Label><Input value={data.attendees} onChange={e => setData({ ...data, attendees: e.target.value })} placeholder="Alice, Bob..." /></div>
+        <div className="col-span-2"><Label>Agenda</Label><textarea className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-200 focus:border-red-400 outline-none" rows={2} value={data.agenda} onChange={e => setData({ ...data, agenda: e.target.value })}></textarea></div>
+        <div className="col-span-2"><Label>Discussion Notes</Label><textarea className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-200 focus:border-red-400 outline-none" rows={4} value={data.discussion} onChange={e => setData({ ...data, discussion: e.target.value })}></textarea></div>
+        <div><Label>Decisions Taken</Label><textarea className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-200 focus:border-red-400 outline-none" rows={3} value={data.decisions} onChange={e => setData({ ...data, decisions: e.target.value })}></textarea></div>
+        <div><Label>Action Items</Label><textarea className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-200 focus:border-red-400 outline-none" rows={3} value={data.action_items} onChange={e => setData({ ...data, action_items: e.target.value })}></textarea></div>
+      </div>
+      <div className="flex justify-end gap-2"><Btn kind="ghost" onClick={onClose}>Cancel</Btn><Btn onClick={save} disabled={saving}>{saving ? "Saving..." : "Save MOM"}</Btn></div>
+    </Modal>
+  );
+}
+
+function NewExtraTaskModal({ projectId, team, onClose, onSaved }) {
+  const [data, setData] = useState({ title: "", module: "Additional", developer: team[0]?.id || "", description: "", priority: "MEDIUM" });
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (!data.title || !data.developer) return alert("Title and Developer required.");
+    setSaving(true);
+    try {
+      await api.createExtraTask(projectId, data);
+      onSaved();
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+  return (
+    <Modal title="Add Additional Task" onClose={onClose}>
+      <div className="space-y-4 mb-5">
+        <div><Label>Task Title</Label><Input value={data.title} onChange={e => setData({ ...data, title: e.target.value })} autoFocus /></div>
+        <div>
+          <Label>Developer</Label>
+          <select value={data.developer} onChange={e => setData({ ...data, developer: e.target.value })} className="w-full border border-gray-300 p-2 text-sm rounded bg-white">
+            {team.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Label>Module</Label><Input value={data.module} onChange={e => setData({ ...data, module: e.target.value })} /></div>
+          <div>
+            <Label>Priority</Label>
+            <select value={data.priority} onChange={e => setData({ ...data, priority: e.target.value })} className="w-full border border-gray-300 p-2 text-sm rounded bg-white">
+              <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="URGENT">Urgent</option>
+            </select>
+          </div>
+        </div>
+        <div><Label>Description</Label><textarea className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-200 outline-none" rows={3} value={data.description} onChange={e => setData({ ...data, description: e.target.value })}></textarea></div>
+      </div>
+      <div className="flex justify-end gap-2"><Btn kind="ghost" onClick={onClose}>Cancel</Btn><Btn onClick={save} disabled={saving}>{saving ? "Saving..." : "Add Task"}</Btn></div>
+    </Modal>
+  );
+}
+
+function EditTaskModal({ task, team, onClose, onSaved }) {
+  const [data, setData] = useState({ title: task.title, module: task.module, developer: task.developer, description: task.description || "", priority: task.priority || "MEDIUM" });
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.patchTask(task.id, data);
+      onSaved();
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+  const del = async () => {
+    if (!confirm("Delete this task entirely? This cannot be undone.")) return;
+    setSaving(true);
+    try {
+      await api.deleteTask(task.id);
+      onSaved();
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+  return (
+    <Modal title="Edit Task" onClose={onClose}>
+      <div className="space-y-4 mb-5">
+        <div><Label>Task Title</Label><Input value={data.title} onChange={e => setData({ ...data, title: e.target.value })} autoFocus /></div>
+        <div>
+          <Label>Developer</Label>
+          <select value={data.developer} onChange={e => setData({ ...data, developer: e.target.value })} className="w-full border border-gray-300 p-2 text-sm rounded bg-white">
+            {team.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Label>Module</Label><Input value={data.module} onChange={e => setData({ ...data, module: e.target.value })} /></div>
+          {task.is_additional && (
+            <div>
+              <Label>Priority</Label>
+              <select value={data.priority} onChange={e => setData({ ...data, priority: e.target.value })} className="w-full border border-gray-300 p-2 text-sm rounded bg-white">
+                <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="URGENT">Urgent</option>
+              </select>
+            </div>
+          )}
+        </div>
+        {task.is_additional && (
+          <div><Label>Description</Label><textarea className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-200 outline-none" rows={3} value={data.description} onChange={e => setData({ ...data, description: e.target.value })}></textarea></div>
+        )}
+      </div>
+      <div className="flex justify-between items-center">
+        <Btn kind="danger" onClick={del} disabled={saving}><Trash2 size={13} /> Delete</Btn>
+        <div className="flex gap-2">
+          <Btn kind="ghost" onClick={onClose}>Cancel</Btn>
+          <Btn onClick={save} disabled={saving}>{saving ? "Saving..." : "Update Task"}</Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 /* ---------- Project detail ---------- */
 function ProjectDetail({ projectId, onBack }) {
   const [project, setProject] = useState(null);
@@ -1217,6 +1505,7 @@ function ProjectDetail({ projectId, onBack }) {
           <Btn kind="outline" small onClick={() => setModal("edit")}><Pencil size={13} /> Edit details</Btn>
           <Btn kind="outline" small onClick={() => setModal("adjust")}><SlidersHorizontal size={13} /> Adjust plan (FDD change)</Btn>
           <Btn kind="outline" small onClick={() => setModal("update")}><Megaphone size={13} /> Post update</Btn>
+          <Btn kind="outline" small onClick={() => setModal("report_formats")}><FileText size={13} /> Report Formats</Btn>
           <Btn kind="danger" small onClick={removeProject}><Trash2 size={13} /></Btn>
         </div>
       </div>
@@ -1233,6 +1522,8 @@ function ProjectDetail({ projectId, onBack }) {
         <Btn kind={view === "gantt" ? "primary" : "ghost"} small onClick={() => setView("gantt")}><BarChart3 size={13} /> Gantt</Btn>
         <Btn kind={view === "report" ? "primary" : "ghost"} small onClick={() => setView("report")}><Mail size={13} /> Weekly report</Btn>
         <Btn kind={view === "daily_report" ? "primary" : "ghost"} small onClick={() => setView("daily_report")}><Mail size={13} /> Daily report</Btn>
+        <Btn kind={view === "custom_report" ? "primary" : "ghost"} small onClick={() => setView("custom_report")}><Sparkles size={13} /> Custom report</Btn>
+        <Btn kind={view === "moms" ? "primary" : "ghost"} small onClick={() => setView("moms")}><Users size={13} /> MOMs</Btn>
         <Btn kind={view === "docs" ? "primary" : "ghost"} small onClick={() => setView("docs")}><Paperclip size={13} /> Documents</Btn>
         {project.architecture && (
           <Btn kind={view === "architecture" ? "primary" : "ghost"} small onClick={() => setView("architecture")}>
@@ -1243,33 +1534,41 @@ function ProjectDetail({ projectId, onBack }) {
 
       {view === "plan" && (
         <>
-          <div className="flex flex-wrap gap-2 mb-4">
-            <button onClick={() => setFilterDev("")} className={`text-xs f-disp font-semibold px-3 py-1.5 rounded-full border ${!filterDev ? "text-white border-transparent" : "border-gray-300 text-gray-600"}`} style={!filterDev ? { background: INK } : {}}>All</button>
-            {project.team_detail.map(t => (
-              <button key={t.id} onClick={() => setFilterDev(t.id)} className={`text-xs f-disp font-semibold px-3 py-1.5 rounded-full border ${filterDev === t.id ? "text-white border-transparent" : "border-gray-300 text-gray-600"}`} style={filterDev === t.id ? { background: RED } : {}}>{t.name}</button>
-            ))}
+          <div className="flex flex-wrap gap-2 mb-4 justify-between">
+            <div className="flex gap-2">
+              <button onClick={() => setFilterDev("")} className={`text-xs f-disp font-semibold px-3 py-1.5 rounded-full border ${!filterDev ? "text-white border-transparent" : "border-gray-300 text-gray-600"}`} style={!filterDev ? { background: INK } : {}}>All</button>
+              {project.team_detail.map(t => (
+                <button key={t.id} onClick={() => setFilterDev(t.id)} className={`text-xs f-disp font-semibold px-3 py-1.5 rounded-full border ${filterDev === t.id ? "text-white border-transparent" : "border-gray-300 text-gray-600"}`} style={filterDev === t.id ? { background: RED } : {}}>{t.name}</button>
+              ))}
+            </div>
+            <Btn small onClick={() => setModal("add_extra_task")}><Plus size={13} /> Add additional task</Btn>
           </div>
           <p className="text-[11px] text-gray-400 mb-3">Change the developer in any row to re-share that task — they're notified and it moves to their list.</p>
           <TaskTable tasks={tasks} filterDev={filterDev} onToggle={toggle}
-            reassignOptions={project.team_detail} onReassign={reassign} onComment={saveComment} />
+            reassignOptions={project.team_detail} onReassign={reassign} onComment={saveComment} onEdit={(task) => setModal(`edit_task:${task.id}`)} />
         </>
       )}
       {view === "gantt" && <GanttView projectId={projectId} project={project} />}
       {view === "report" && <WeeklyReport projectId={projectId} project={project} tasks={tasks} />}
       {view === "daily_report" && <DailyReport projectId={projectId} project={project} tasks={tasks} />}
+      {view === "custom_report" && <CustomRangeReport projectId={projectId} project={project} />}
+      {view === "moms" && <MomsView projectId={projectId} project={project} />}
       {view === "docs" && <DocumentsView projectId={projectId} project={project} />}
       {view === "architecture" && project.architecture && <ArchitectureView architecture={project.architecture} projectName={project.name} />}
 
       {modal === "summary" && <SummaryModal projectId={projectId} name={project.name} onClose={() => setModal(null)} />}
+      {modal === "report_formats" && <ReportFormatsModal projectId={projectId} onClose={() => setModal(null)} />}
       {modal === "edit" && <EditProjectModal project={project} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
       {modal === "adjust" && <AdjustModal projectId={projectId} onClose={() => setModal(null)} onApplied={() => { setModal(null); load(); }} />}
       {modal === "update" && <UpdateModal onClose={() => setModal(null)} onPost={async (text) => { await api.postUpdate(projectId, text); setModal(null); load(); }} />}
+      {modal === "add_extra_task" && <NewExtraTaskModal projectId={projectId} team={project.team_detail} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
+      {modal?.startsWith("edit_task:") && <EditTaskModal task={tasks.find(t => t.id === Number(modal.split(":")[1]))} team={project.team_detail} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
     </div>
   );
 }
 
 /* ---------- Task table (saved tasks) ---------- */
-function TaskTable({ tasks, filterDev, onToggle, reassignOptions, onReassign, onComment }) {
+function TaskTable({ tasks, filterDev, onToggle, reassignOptions, onReassign, onComment, onEdit }) {
   const [expanded, setExpanded] = useState(null);
   const [commentText, setCommentText] = useState("");
 
@@ -1323,7 +1622,10 @@ function TaskTable({ tasks, filterDev, onToggle, reassignOptions, onReassign, on
                         </td>
                         <td className="py-2.5 w-28 text-xs text-gray-500">{r.module}</td>
                         <td className="py-2.5 pr-3">
-                          <span className={r.status === "DONE" ? "line-through text-gray-400" : ""}>{r.title}</span>
+                          <span className={r.status === "DONE" ? "line-through text-gray-400" : ""}>
+                            {r.is_additional && <span className="mr-1.5 px-1 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700">Extra</span>}
+                            {r.title}
+                          </span>
                           {r.comment && (
                             <div className="text-[11px] text-gray-500 mt-1 flex items-start gap-1 max-w-sm truncate" title={r.comment}>
                               <MessageSquare size={10} className="shrink-0 mt-0.5" />
@@ -1333,6 +1635,9 @@ function TaskTable({ tasks, filterDev, onToggle, reassignOptions, onReassign, on
                         </td>
                         <td className="px-3 py-2.5 text-right w-24">
                           <div className="flex justify-end gap-3 items-center">
+                            <button onClick={() => onEdit && onEdit(r)} title="Edit Task" className="text-gray-300 hover:text-indigo-500">
+                              <Pencil size={15} />
+                            </button>
                             <button onClick={() => toggleExpand(r)} title="Comments">
                               <MessageSquare size={16} className={r.comment ? "text-indigo-500 fill-indigo-100" : "text-gray-300 hover:text-gray-500"} />
                             </button>
@@ -1454,6 +1759,44 @@ function GanttView({ projectId, project }) {
 }
 
 /* ---------- Weekly report ---------- */
+/* ---------- Tag-style email input ---------- */
+function EmailTagInput({ tags, setTags, placeholder = "Add email and press Enter…" }) {
+  const [inputVal, setInputVal] = useState("");
+  const addTag = (val) => {
+    const emails = val.split(/[,\s]+/).map(e => e.trim()).filter(e => e.includes("@"));
+    if (emails.length) setTags(prev => [...new Set([...prev, ...emails])]);
+    setInputVal("");
+  };
+  const onKey = (e) => {
+    if (["Enter", ",", " ", "Tab"].includes(e.key)) {
+      e.preventDefault();
+      addTag(inputVal);
+    } else if (e.key === "Backspace" && !inputVal && tags.length) {
+      setTags(prev => prev.slice(0, -1));
+    }
+  };
+  const remove = (tag) => setTags(prev => prev.filter(t => t !== tag));
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 border border-gray-300 rounded-md px-2 py-1.5 bg-white focus-within:ring-2 focus-within:ring-red-200 focus-within:border-red-400 min-h-[40px]">
+      {tags.map(tag => (
+        <span key={tag} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full border border-blue-200">
+          {tag}
+          <button type="button" onClick={() => remove(tag)} className="text-blue-400 hover:text-blue-700 leading-none">×</button>
+        </span>
+      ))}
+      <input
+        type="text"
+        value={inputVal}
+        onChange={e => setInputVal(e.target.value)}
+        onKeyDown={onKey}
+        onBlur={() => inputVal && addTag(inputVal)}
+        placeholder={tags.length ? "" : placeholder}
+        className="flex-1 min-w-[160px] text-xs outline-none bg-transparent py-0.5"
+      />
+    </div>
+  );
+}
+
 function WeeklyReport({ projectId, project, tasks }) {
   const weekNums = [...new Set(tasks.map(t => t.week))].sort((a, b) => a - b);
   const today = todayISO();
@@ -1463,6 +1806,9 @@ function WeeklyReport({ projectId, project, tasks }) {
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [sharedLink, setSharedLink] = useState(null);
+  const [emailTags, setEmailTags] = useState([]);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => { api.report(projectId, week).then(r => setText(r.text)); }, [projectId, week]);
 
@@ -1471,15 +1817,22 @@ function WeeklyReport({ projectId, project, tasks }) {
     const blob = new Blob([text], { type: "text/plain" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${project.name.replace(/\s+/g, "_")}_W${week}_report.txt`;
+    a.download = `${project.name.replace(/\s+/g, "_")}_week${week}_report.txt`;
     a.click();
   };
   const downloadPdf = async () => {
     setPdfBusy(true);
-    try { await api.reportPdf(projectId, week, project.name); } catch (e) { alert(e.message); }
+    try { await api.reportPdf(projectId, week, project.name, text); } catch (e) { alert(e.message); }
     setPdfBusy(false);
   };
-  const send = async () => { await api.emailReport(projectId, week); setSent(true); setTimeout(() => setSent(false), 2500); };
+  const send = async () => {
+    setSending(true);
+    try {
+      await api.emailReport(projectId, week, emailTags.join(","), text);
+      setSent(true); setTimeout(() => setSent(false), 2500);
+    } catch (e) { alert(e.message); }
+    setSending(false);
+  };
 
   return (
     <Card className="p-5">
@@ -1491,16 +1844,40 @@ function WeeklyReport({ projectId, project, tasks }) {
           </select>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Btn kind="outline" small onClick={async () => {
+            setPdfBusy(true);
+            try {
+              const { link } = await api.shareLink(projectId, { type: "weekly", week });
+              setSharedLink(link);
+            } catch (e) { alert(e.message); }
+            setPdfBusy(false);
+          }} disabled={pdfBusy}><Link2 size={13} /> Get Link</Btn>
           <Btn kind="outline" small onClick={copy}><Copy size={13} /> {copied ? "Copied!" : "Copy"}</Btn>
           <Btn kind="outline" small onClick={downloadTxt}><Download size={13} /> TXT</Btn>
           <Btn kind="outline" small onClick={downloadPdf} disabled={pdfBusy}>
             {pdfBusy ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} PDF
           </Btn>
-          <Btn small onClick={send}><Mail size={13} /> {sent ? "Sent!" : "Email me now"}</Btn>
         </div>
       </div>
-      <p className="text-[11px] text-gray-400 mb-3">This report is auto-saved as a PDF to Documents every Friday at 18:30.</p>
-      <pre className="text-xs bg-gray-50 border border-gray-200 rounded-md p-4 overflow-x-auto whitespace-pre-wrap leading-relaxed">{text || "Loading…"}</pre>
+      <p className="text-[11px] text-gray-400 mb-1">This report is auto-saved as a PDF to Documents every Friday at 18:30.</p>
+      <p className="text-[11px] text-gray-500 mb-3 font-medium">✏️ You can edit the text below before emailing or downloading the PDF.</p>
+      <textarea
+        className="w-full text-xs bg-gray-50 border border-gray-200 rounded-md p-4 overflow-x-auto whitespace-pre-wrap leading-relaxed font-mono focus:outline-none focus:ring-2 focus:ring-red-200 resize-y"
+        rows={18}
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder="Loading…"
+      />
+      <div className="mt-4 space-y-2">
+        <Label>Email Recipients</Label>
+        <EmailTagInput tags={emailTags} setTags={setEmailTags} placeholder="Type email and press Enter or comma…" />
+        <div className="flex justify-end">
+          <Btn small onClick={send} disabled={sending}>
+            <Mail size={13} /> {sending ? "Sending…" : sent ? "Sent! ✓" : "Send Report Email"}
+          </Btn>
+        </div>
+      </div>
+      {sharedLink && <ShareLinkModal link={sharedLink} onClose={() => setSharedLink(null)} />}
     </Card>
   );
 }
@@ -1514,6 +1891,10 @@ function DailyReport({ projectId, project, tasks }) {
   const [text, setText] = useState("");
   const [copied, setCopied] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [sharedLink, setSharedLink] = useState(null);
+  const [emailTags, setEmailTags] = useState([]);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
 
   useEffect(() => { api.dailyReport(projectId, date).then(r => setText(r.text)); }, [projectId, date]);
 
@@ -1527,8 +1908,16 @@ function DailyReport({ projectId, project, tasks }) {
   };
   const downloadPdf = async () => {
     setPdfBusy(true);
-    try { await api.dailyReportPdf(projectId, date, project.name); } catch (e) { alert(e.message); }
+    try { await api.dailyReportPdf(projectId, date, project.name, text); } catch (e) { alert(e.message); }
     setPdfBusy(false);
+  };
+  const send = async () => {
+    setSending(true);
+    try {
+      await api.emailDailyReport(projectId, date, emailTags.join(","), text);
+      setSent(true); setTimeout(() => setSent(false), 2500);
+    } catch (e) { alert(e.message); }
+    setSending(false);
   };
 
   return (
@@ -1541,20 +1930,67 @@ function DailyReport({ projectId, project, tasks }) {
           </select>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Btn kind="outline" small onClick={copy}><Copy size={13} /> {copied ? "Copied!" : "Copy"}</Btn>
+          <Btn kind="outline" small onClick={async () => {
+            setPdfBusy(true);
+            try {
+              const { link } = await api.shareLink(projectId, { type: "daily", date });
+              setSharedLink(link);
+            } catch (e) { alert(e.message); }
+            setPdfBusy(false);
+          }} disabled={pdfBusy}><Link2 size={13} /> Get Link</Btn>
           <Btn kind="outline" small onClick={downloadTxt}><Download size={13} /> TXT</Btn>
           <Btn kind="outline" small onClick={downloadPdf} disabled={pdfBusy}>
             {pdfBusy ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} PDF
           </Btn>
         </div>
       </div>
-      <p className="text-[11px] text-gray-400 mb-3">Daily reports are auto-saved as PDFs to Documents every Mon-Fri at 18:30.</p>
-      <pre className="text-xs bg-gray-50 border border-gray-200 rounded-md p-4 overflow-x-auto whitespace-pre-wrap leading-relaxed">{text || "Loading…"}</pre>
+      <p className="text-[11px] text-gray-400 mb-1">Daily reports are auto-saved as PDFs to Documents every Mon–Fri at 18:30.</p>
+      <p className="text-[11px] text-gray-500 mb-3 font-medium">✏️ You can edit the text below before emailing or downloading the PDF.</p>
+      <textarea
+        className="w-full text-xs bg-gray-50 border border-gray-200 rounded-md p-4 overflow-x-auto whitespace-pre-wrap leading-relaxed font-mono focus:outline-none focus:ring-2 focus:ring-red-200 resize-y"
+        rows={15}
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder="Loading…"
+      />
+      <div className="mt-4 space-y-2">
+        <Label>Email Recipients</Label>
+        <EmailTagInput tags={emailTags} setTags={setEmailTags} placeholder="Type email and press Enter or comma…" />
+        <div className="flex justify-end">
+          <Btn small onClick={send} disabled={sending}>
+            <Mail size={13} /> {sending ? "Sending…" : sent ? "Sent! ✓" : "Send Daily Email"}
+          </Btn>
+        </div>
+      </div>
+      {sharedLink && <ShareLinkModal link={sharedLink} onClose={() => setSharedLink(null)} />}
     </Card>
   );
 }
 
 /* ---------- Modals ---------- */
+
+function ShareLinkModal({ link, onClose }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { }
+  };
+  return (
+    <Modal title="Share Report" onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-sm text-gray-600">Your report has been generated and saved to blob storage. You can share this public link with anyone.</p>
+        <div className="flex gap-2">
+          <Input value={link} readOnly className="flex-1 font-mono text-xs" />
+          <Btn onClick={copy}><Copy size={13} /> {copied ? "Copied!" : "Copy Link"}</Btn>
+        </div>
+        <p className="text-xs text-gray-400">This link points directly to the PDF file.</p>
+      </div>
+      <div className="flex justify-end mt-4">
+        <Btn kind="ghost" onClick={onClose}>Close</Btn>
+      </div>
+    </Modal>
+  );
+}
+
 function SummaryModal({ projectId, name, onClose }) {
   const [text, setText] = useState(""); const [err, setErr] = useState(""); const [copied, setCopied] = useState(false);
   useEffect(() => { api.summary(projectId).then(r => setText(r.text)).catch(e => setErr(e.message)); }, [projectId]);
@@ -1600,7 +2036,7 @@ function EditProjectModal({ project, onClose, onSaved }) {
     setErr("");
     if (!form.name.trim()) return setErr("Project name is required.");
     if (!teamIds.length) return setErr("Select at least one team member.");
-    
+
     setBusy(true);
     try {
       const fd = new FormData();
@@ -1668,8 +2104,8 @@ function EditProjectModal({ project, onClose, onSaved }) {
             {team
               .filter(t => teamIds.includes(t.id))
               .map(t => {
-                const isSuggestedManager = (t.designation || "").toLowerCase().includes("manager") || 
-                                          (t.designation || "").toLowerCase().includes("lead");
+                const isSuggestedManager = (t.designation || "").toLowerCase().includes("manager") ||
+                  (t.designation || "").toLowerCase().includes("lead");
                 return (
                   <button
                     key={t.id}
@@ -1835,7 +2271,7 @@ function DevShell({ me, signOut }) {
             </div>
             {p.latest_update && (
               <div className="bg-amber-50 p-2 rounded text-sm text-amber-900 border border-amber-100">
-                <div className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1 flex items-center gap-1"><Megaphone size={10}/> Latest Update</div>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1 flex items-center gap-1"><Megaphone size={10} /> Latest Update</div>
                 {p.latest_update.text}
               </div>
             )}
@@ -2094,7 +2530,7 @@ function ArchitectureView({ architecture, projectName }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
               {content.key_components.map((comp, i) => (
                 <div key={i} className="border border-gray-200 rounded p-4">
-                  <div className="font-semibold text-red-600 text-sm mb-1">Component {i+1}</div>
+                  <div className="font-semibold text-red-600 text-sm mb-1">Component {i + 1}</div>
                   <p className="text-gray-700 text-sm">{typeof comp === "string" ? comp : JSON.stringify(comp)}</p>
                 </div>
               ))}
@@ -2165,5 +2601,104 @@ function ArchitectureView({ architecture, projectName }) {
         </div>
       )}
     </Card>
+  );
+}
+
+/* ---------- Report Formats Modal ---------- */
+function ReportFormatsModal({ projectId, onClose }) {
+  const [data, setData] = useState({ weekly_format: "", daily_format: "", custom_format: "" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.getReportFormat(projectId).then(res => {
+      setData({
+        weekly_format: res.weekly_format || "",
+        daily_format: res.daily_format || "",
+        custom_format: res.custom_format || ""
+      });
+      setLoading(false);
+    });
+  }, [projectId]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.saveReportFormat(projectId, data);
+      onClose();
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+
+  if (loading) return <Modal title="Report Formats" onClose={onClose}><Spinner /></Modal>;
+
+  return (
+    <Modal title="Report Formats" onClose={onClose} wide>
+      <div className="space-y-4">
+        <p className="text-xs text-gray-500">Define the exact layout for plain-text reports using placeholders like <code>{"{project}"}</code>, <code>{"{completed}"}</code>, <code>{"{pending}"}</code>, <code>{"{pct}"}</code>. Leave blank to use defaults.</p>
+        <div>
+          <Label>Weekly Format Template</Label>
+          <textarea className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-200 focus:border-red-400 outline-none font-mono text-xs" rows={6} value={data.weekly_format} onChange={e => setData({ ...data, weekly_format: e.target.value })} placeholder="Available: {project}, {week}, {done}, {total}, {pct}, {completed}, {pending}"></textarea>
+        </div>
+        <div>
+          <Label>Daily Format Template</Label>
+          <textarea className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-200 focus:border-red-400 outline-none font-mono text-xs" rows={6} value={data.daily_format} onChange={e => setData({ ...data, daily_format: e.target.value })} placeholder="Available: {project}, {date}, {done_today}, {total_today}, {overall_pct}, {completed}, {pending}"></textarea>
+        </div>
+        <div>
+          <Label>Custom Range Format Template</Label>
+          <textarea className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-200 focus:border-red-400 outline-none font-mono text-xs" rows={6} value={data.custom_format} onChange={e => setData({ ...data, custom_format: e.target.value })} placeholder="Available: {project}, {date_from}, {date_to}, {done_range}, {total_range}, {pct}, {completed}, {pending}"></textarea>
+        </div>
+      </div>
+      <div className="flex justify-end gap-2 mt-6">
+        <Btn kind="ghost" onClick={onClose}>Cancel</Btn>
+        <Btn onClick={save} disabled={saving}>{saving ? "Saving..." : "Save Formats"}</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+/* ---------- Org Settings Modal ---------- */
+function OrgSettingsModal({ onClose }) {
+  const [data, setData] = useState({ company_name: "", company_tagline: "", logo_url: "", pdf_accent_color: "", pdf_header_text: "", pdf_footer_text: "", email_signature: "" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.getOrgSettings().then(res => {
+      setData(res);
+      setLoading(false);
+    }).catch(e => {
+      alert("Failed to load settings: " + e.message);
+      onClose();
+    });
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.saveOrgSettings(data);
+      onClose();
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+
+  if (loading) return <Modal title="Organization Settings" onClose={onClose}><Spinner /></Modal>;
+
+  return (
+    <Modal title="Organization Settings" onClose={onClose}>
+      <div className="space-y-3 mb-6 max-h-[60vh] overflow-y-auto pr-2">
+        <div><Label>Company Name</Label><Input value={data.company_name} onChange={e => setData({ ...data, company_name: e.target.value })} /></div>
+        <div><Label>Company Tagline</Label><Input value={data.company_tagline} onChange={e => setData({ ...data, company_tagline: e.target.value })} /></div>
+        <div><Label>Logo URL</Label><Input value={data.logo_url} onChange={e => setData({ ...data, logo_url: e.target.value })} placeholder="https://..." /></div>
+        <div><Label>PDF Accent Color (Hex)</Label><Input type="color" className="h-10 p-1" value={data.pdf_accent_color} onChange={e => setData({ ...data, pdf_accent_color: e.target.value })} /></div>
+        <div><Label>PDF Header Text</Label><textarea className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-200 outline-none" rows={2} value={data.pdf_header_text} onChange={e => setData({ ...data, pdf_header_text: e.target.value })}></textarea></div>
+        <div><Label>PDF Footer Text</Label><Input value={data.pdf_footer_text} onChange={e => setData({ ...data, pdf_footer_text: e.target.value })} /></div>
+        <div><Label>Email Signature (Plain Text)</Label><textarea className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-red-200 outline-none" rows={3} value={data.email_signature} onChange={e => setData({ ...data, email_signature: e.target.value })}></textarea></div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Btn kind="ghost" onClick={onClose}>Cancel</Btn>
+        <Btn onClick={save} disabled={saving}>{saving ? "Saving..." : "Save Settings"}</Btn>
+      </div>
+    </Modal>
   );
 }
