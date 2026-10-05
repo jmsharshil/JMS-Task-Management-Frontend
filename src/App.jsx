@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Users, Briefcase, FolderKanban, LayoutDashboard, Plus, Trash2, ChevronRight, ChevronDown, CheckCircle2, Circle, FileText, Loader2, Mail, Copy, Download, ArrowLeft, RefreshCw, LogOut, X, AlertTriangle, Sparkles, BarChart3, Megaphone, SlidersHorizontal, Bot, MessageSquare, Paperclip, UploadCloud, Eye, Pencil, Link2, Settings } from "lucide-react";
+import { Users, Briefcase, FolderKanban, LayoutDashboard, Plus, Trash2, ChevronRight, ChevronDown, CheckCircle2, Circle, FileText, Loader2, Mail, Copy, Download, ArrowLeft, RefreshCw, LogOut, X, AlertTriangle, Sparkles, BarChart3, Megaphone, SlidersHorizontal, Bot, MessageSquare, Paperclip, UploadCloud, Eye, Pencil, Link2, Settings, Target } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend
 } from "recharts";
 import { api, getToken, setToken } from "./api";
+import ReportEditor from "./ReportEditor";
+import MilestonesView from "./MilestonesView";
 
 const RED = "#D6222A", INK = "#1A1D23", GREEN = "#178A50";
 const MODULE_COLORS = ["#D6222A", "#1D6FB8", "#178A50", "#B8860B", "#7A3FB8", "#C25A1E", "#0F8A8A", "#8A0F55", "#5A6B1E", "#3F51B5", "#996633", "#607D8B"];
@@ -1505,7 +1507,7 @@ function ProjectDetail({ projectId, onBack }) {
           <Btn kind="outline" small onClick={() => setModal("edit")}><Pencil size={13} /> Edit details</Btn>
           <Btn kind="outline" small onClick={() => setModal("adjust")}><SlidersHorizontal size={13} /> Adjust plan (FDD change)</Btn>
           <Btn kind="outline" small onClick={() => setModal("update")}><Megaphone size={13} /> Post update</Btn>
-          <Btn kind="outline" small onClick={() => setModal("report_formats")}><FileText size={13} /> Report Formats</Btn>
+
           <Btn kind="danger" small onClick={removeProject}><Trash2 size={13} /></Btn>
         </div>
       </div>
@@ -1520,9 +1522,8 @@ function ProjectDetail({ projectId, onBack }) {
       <div className="flex gap-2 mb-4 flex-wrap">
         <Btn kind={view === "plan" ? "primary" : "ghost"} small onClick={() => setView("plan")}>Plan</Btn>
         <Btn kind={view === "gantt" ? "primary" : "ghost"} small onClick={() => setView("gantt")}><BarChart3 size={13} /> Gantt</Btn>
-        <Btn kind={view === "report" ? "primary" : "ghost"} small onClick={() => setView("report")}><Mail size={13} /> Weekly report</Btn>
-        <Btn kind={view === "daily_report" ? "primary" : "ghost"} small onClick={() => setView("daily_report")}><Mail size={13} /> Daily report</Btn>
-        <Btn kind={view === "custom_report" ? "primary" : "ghost"} small onClick={() => setView("custom_report")}><Sparkles size={13} /> Custom report</Btn>
+        <Btn kind={view === "milestones" ? "primary" : "ghost"} small onClick={() => setView("milestones")}><Target size={13} /> Milestones</Btn>
+        <Btn kind={view === "report_editor" ? "primary" : "ghost"} small onClick={() => setView("report_editor")}><FileText size={13} /> Reports</Btn>
         <Btn kind={view === "moms" ? "primary" : "ghost"} small onClick={() => setView("moms")}><Users size={13} /> MOMs</Btn>
         <Btn kind={view === "docs" ? "primary" : "ghost"} small onClick={() => setView("docs")}><Paperclip size={13} /> Documents</Btn>
         {project.architecture && (
@@ -1549,15 +1550,14 @@ function ProjectDetail({ projectId, onBack }) {
         </>
       )}
       {view === "gantt" && <GanttView projectId={projectId} project={project} />}
-      {view === "report" && <WeeklyReport projectId={projectId} project={project} tasks={tasks} />}
-      {view === "daily_report" && <DailyReport projectId={projectId} project={project} tasks={tasks} />}
-      {view === "custom_report" && <CustomRangeReport projectId={projectId} project={project} />}
+      {view === "milestones" && <MilestonesView projectId={projectId} project={project} />}
+      {view === "report_editor" && <ReportEditor projectId={projectId} project={project} tasks={tasks} />}
       {view === "moms" && <MomsView projectId={projectId} project={project} />}
       {view === "docs" && <DocumentsView projectId={projectId} project={project} />}
       {view === "architecture" && project.architecture && <ArchitectureView architecture={project.architecture} projectName={project.name} />}
 
       {modal === "summary" && <SummaryModal projectId={projectId} name={project.name} onClose={() => setModal(null)} />}
-      {modal === "report_formats" && <ReportFormatsModal projectId={projectId} onClose={() => setModal(null)} />}
+
       {modal === "edit" && <EditProjectModal project={project} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
       {modal === "adjust" && <AdjustModal projectId={projectId} onClose={() => setModal(null)} onApplied={() => { setModal(null); load(); }} />}
       {modal === "update" && <UpdateModal onClose={() => setModal(null)} onPost={async (text) => { await api.postUpdate(projectId, text); setModal(null); load(); }} />}

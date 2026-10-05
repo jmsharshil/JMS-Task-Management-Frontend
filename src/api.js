@@ -158,6 +158,12 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
+  // Milestones
+  getMilestones: (projectId) => request(`/milestones/?project_id=${projectId}`),
+  createMilestone: (data) => request("/milestones/", { method: "POST", body: data }),
+  updateMilestone: (id, data) => request(`/milestones/${id}/`, { method: "PATCH", body: data }),
+  deleteMilestone: (id) => request(`/milestones/${id}/`, { method: "DELETE" }),
+
   // MOMs
   moms: (projectId) => request(`/projects/${projectId}/moms/`),
   createMom: (projectId, body) => request(`/projects/${projectId}/moms/`, { method: "POST", body }),
