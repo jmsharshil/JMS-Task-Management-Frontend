@@ -17,7 +17,7 @@ import {
   Send, ExternalLink, Save, RotateCcw, Layers, Clock, AlertCircle, Target,
   CheckCircle, AlertTriangle, Hourglass
 } from "lucide-react";
-import { api } from "./api";
+import { api, getToken } from "./api";
 
 /* ─── colours (mirrors App.jsx) ─────────────────────────────── */
 const RED = "#D6222A";
@@ -444,8 +444,8 @@ export default function ReportEditor({ projectId, project, tasks: projectTasks }
           ))}
         </div>
 
-        {/* Params strip */}
-        <div className="px-5 py-3 flex flex-wrap items-end gap-4 bg-gray-50/50">
+          {mode !== "milestones" && (
+          <div className="px-5 py-3 flex flex-wrap items-end gap-4 bg-gray-50/50">
           {mode === "weekly" && (
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Week</label>
@@ -490,9 +490,11 @@ export default function ReportEditor({ projectId, project, tasks: projectTasks }
             <StatBadge label="% Done" value={`${modeStats.pct}%`} color={INDIGO} />
           </div>
         </div>
+        )}
       </div>
 
-      {/* MAIN EDITOR AREA */}
+      {/* MAIN EDITOR AREA — hidden when mode is milestones */}
+      {mode !== "milestones" && (
       <div className={`grid gap-4 ${viewMode === "split" ? "lg:grid-cols-[320px_1fr]" : "grid-cols-1"}`}>
 
         {/* LEFT: Task Selector Panel */}
@@ -672,29 +674,41 @@ export default function ReportEditor({ projectId, project, tasks: projectTasks }
               </div>
             )}
 
-            {/* Share link panel */}
+            {/* Share link modal dialog */}
             {showSharePanel && sharedLink && (
-              <div className="border border-green-200 rounded-xl bg-green-50/40 p-4 mb-3">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-green-700 flex items-center gap-1.5">
-                    <Link2 size={12} /> Shareable PDF Link
-                  </label>
-                  <button onClick={() => setShowSharePanel(false)} className="text-gray-400 hover:text-gray-700">
-                    <X size={14} />
-                  </button>
-                </div>
-                <p className="text-[11px] text-gray-500 mb-2">Anyone with this link can view the report PDF directly.</p>
-                <div className="flex gap-2">
-                  <input readOnly value={sharedLink}
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono bg-white text-gray-700 focus:outline-none" />
-                  <RBtn small onClick={async () => { await navigator.clipboard.writeText(sharedLink); setCopied(true); setTimeout(() => setCopied(false), 1800); }} variant="success" id="re-copy-link-btn">
-                    <Copy size={12} /> {copied ? "Copied!" : "Copy"}
-                  </RBtn>
-                  <a href={sharedLink} target="_blank" rel="noreferrer">
-                    <RBtn small variant="outline" id="re-open-link-btn">
-                      <ExternalLink size={12} /> Open
-                    </RBtn>
-                  </a>
+              <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in" onClick={() => setShowSharePanel(false)}>
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/80">
+                    <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                      <Link2 size={16} className="text-emerald-600" /> Shareable Report Link
+                    </h3>
+                    <button onClick={() => setShowSharePanel(false)} className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-200/50 transition-colors">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="p-6">
+                    <p className="text-xs text-gray-600 mb-4 leading-relaxed">
+                      Anyone with this link can view or download the report PDF directly.
+                    </p>
+                    <div className="flex items-center gap-2 mb-4">
+                      <input readOnly value={sharedLink}
+                        onClick={e => e.target.select()}
+                        className="flex-1 border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-mono bg-gray-50 text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+                      <RBtn onClick={async () => { await navigator.clipboard.writeText(sharedLink); setCopied(true); setTimeout(() => setCopied(false), 1800); }} variant="success" id="re-copy-link-btn">
+                        <Copy size={13} /> {copied ? "Copied!" : "Copy"}
+                      </RBtn>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                      <a href={sharedLink} target="_blank" rel="noreferrer">
+                        <RBtn variant="outline" id="re-open-link-btn">
+                          <ExternalLink size={13} /> Open Link
+                        </RBtn>
+                      </a>
+                      <RBtn onClick={() => setShowSharePanel(false)} variant="ghost">
+                        Close
+                      </RBtn>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -765,6 +779,7 @@ export default function ReportEditor({ projectId, project, tasks: projectTasks }
 
         </div>
       </div>
+      )} {/* end mode !== milestones */}
 
       {/* ── MILESTONE REPORT PANEL ─────────────────────────────── */}
       {mode === "milestones" && (
@@ -797,6 +812,10 @@ const sortMilestones = (list) =>
 function MilestoneReportPanel({ projectId, project, milestones, loading }) {
   const today = new Date().toISOString().slice(0, 10);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [sharedLink, setSharedLink] = useState(null);
+  const [showSharePanel, setShowSharePanel] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [err, setErr] = useState("");
 
   /* ── Date range filter ─────────────────────────────────────── */
@@ -831,23 +850,49 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
   const handlePdf = async () => {
     setPdfBusy(true); setErr("");
     try {
-      const html = buildMilestoneHtml(project, filteredMilestones, filterMode, filterField, fromDate, toDate);
-      const token = localStorage.getItem("access") || "";
+      const html = buildMilestoneHtml(project, filteredMilestones);
+      const token = getToken() || "";
       const res = await fetch(`/api/milestone-report-pdf/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ html, project_name: project.name }),
       });
-      if (!res.ok) throw new Error(`PDF failed (${res.status})`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `PDF generation failed (${res.status})`);
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url; a.download = `${project.name.replace(/\s+/g,"_")}_milestones.pdf`;
       a.click(); URL.revokeObjectURL(url);
     } catch (e) {
-      window.print(); // Fallback: browser print dialog
+      setErr(e.message || "PDF generation failed.");
     }
     setPdfBusy(false);
+  };
+
+  const handleGetLink = async () => {
+    setLinkBusy(true); setErr(""); setSharedLink(null);
+    try {
+      const html = buildMilestoneHtml(project, filteredMilestones);
+      const token = getToken() || "";
+      const res = await fetch(`/api/projects/${projectId}/share-link/`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "milestones", html }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `Link generation failed (${res.status})`);
+      }
+      const data = await res.json();
+      setSharedLink(data.link);
+      setShowSharePanel(true);
+    } catch (e) {
+      setErr(e.message || "Failed to generate share link.");
+    }
+    setLinkBusy(false);
   };
 
   const rangeLabel = filterMode === "range"
@@ -915,6 +960,10 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
 
           {/* Export buttons */}
           <div className="flex gap-2 flex-wrap">
+            <RBtn onClick={handleGetLink} disabled={linkBusy} variant="success" id="ms-get-link-btn">
+              {linkBusy ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />}
+              {linkBusy ? "Generating..." : "Get Link"}
+            </RBtn>
             <RBtn onClick={handlePdf} disabled={pdfBusy} variant="primary" id="ms-pdf-btn">
               {pdfBusy ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
               {pdfBusy ? "Generating..." : "Download PDF"}
@@ -926,23 +975,50 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
         </div>
       </div>
 
-      {/* ── Table ──────────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden" id="ms-report-table">
-        <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
-          <div>
-            <div className="text-xs font-bold text-gray-900 flex items-center gap-2">
-              <Target size={14} style={{ color: INDIGO }} /> {project.name} — Milestone Status Report
+      {/* Shareable Link Modal Dialog */}
+      {showSharePanel && sharedLink && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in" onClick={() => setShowSharePanel(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/80">
+              <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                <Link2 size={16} className="text-emerald-600" /> Shareable Milestone Report Link
+              </h3>
+              <button onClick={() => setShowSharePanel(false)} className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-200/50 transition-colors">
+                <X size={18} />
+              </button>
             </div>
-            <div className="text-[10px] text-gray-400 mt-0.5">
-              {new Date().toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" })}{rangeLabel}
-              {" · "}<span className="font-semibold text-indigo-600">{filteredMilestones.length} milestones</span>
-              {" · "}<span className="text-gray-400">sorted: Completed → On Track → At Risk → Delayed</span>
+            <div className="p-6">
+              <p className="text-xs text-gray-600 mb-4 leading-relaxed">
+                Anyone with this link can view or download the milestone report PDF directly.
+              </p>
+              <div className="flex items-center gap-2 mb-4">
+                <input readOnly value={sharedLink}
+                  onClick={e => e.target.select()}
+                  className="flex-1 border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-mono bg-gray-50 text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+                <RBtn onClick={async () => { await navigator.clipboard.writeText(sharedLink); setCopied(true); setTimeout(() => setCopied(false), 1800); }} variant="success" id="ms-modal-copy-btn">
+                  <Copy size={13} /> {copied ? "Copied!" : "Copy"}
+                </RBtn>
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                <a href={sharedLink} target="_blank" rel="noreferrer">
+                  <RBtn variant="outline" id="ms-modal-open-btn">
+                    <ExternalLink size={13} /> Open Link
+                  </RBtn>
+                </a>
+                <RBtn onClick={() => setShowSharePanel(false)} variant="ghost">
+                  Close
+                </RBtn>
+              </div>
             </div>
           </div>
-          <div className="text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-200">
-            {filteredMilestones.filter(m=>m.status==="COMPLETED").length} done ·{" "}
-            {filteredMilestones.filter(m=>m.status==="AT_RISK").length} at risk ·{" "}
-            {filteredMilestones.filter(m=>m.status==="DELAYED").length} delayed
+        </div>
+      )}
+
+      {/* ── Table ──────────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden" id="ms-report-table">
+        <div className="px-5 pt-4 pb-3 border-b border-gray-100">
+          <div className="text-xs font-bold text-gray-900 flex items-center gap-2">
+            <Target size={14} style={{ color: INDIGO }} /> {project.name} — Milestone Status Report
           </div>
         </div>
 
@@ -952,16 +1028,39 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
             <p className="text-xs">Loading milestones...</p>
           </div>
         ) : (
-          <div className="overflow-x-auto pb-5">
-            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"12px" }}>
+          <div style={{ overflowX: "auto", width: "100%" }}>
+            <table style={{
+              width: "100%",
+              minWidth: "1300px",
+              borderCollapse: "collapse",
+              fontSize: "12px",
+              tableLayout: "fixed",
+            }}>
+              <colgroup>
+                <col style={{ width: "130px" }} />
+                <col style={{ width: "220px" }} />
+                <col style={{ width: "100px" }} />
+                <col style={{ width: "110px" }} />
+                <col style={{ width: "130px" }} />
+                <col style={{ width: "140px" }} />
+                <col style={{ width: "120px" }} />
+                <col style={{ width: "120px" }} />
+                <col style={{ width: "230px" }} />
+              </colgroup>
               <thead>
                 <tr style={{ background:"#f8fafc" }}>
                   {["Project","Open Item","Status","Owner","Dependency","Next Milestone","Committed Date","Final Closure Date","Risk / Blocker & Action"]
                     .map(h => (
                       <th key={h} style={{
-                        padding:"10px 12px", border:"1px solid #d1d5db",
-                        fontWeight:700, color:"#374151", fontSize:"11px",
-                        textAlign:"left", whiteSpace:"nowrap", verticalAlign:"bottom",
+                        padding:"10px 12px",
+                        border:"1px solid #d1d5db",
+                        fontWeight:700,
+                        color:"#374151",
+                        fontSize:"11px",
+                        textAlign:"left",
+                        verticalAlign:"bottom",
+                        wordBreak:"break-word",
+                        lineHeight:"1.3",
                       }}>{h}</th>
                     ))}
                 </tr>
@@ -978,35 +1077,44 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
                 ) : (
                   filteredMilestones.map((m, i) => {
                     const s = MS_STATUS[m.status] || MS_STATUS.ON_TRACK;
+                    const cellStyle = {
+                      padding:"10px 12px",
+                      border:"1px solid #e5e7eb",
+                      color:"#374151",
+                      verticalAlign:"top",
+                      wordBreak:"break-word",
+                      whiteSpace:"normal",
+                      lineHeight:"1.4",
+                      fontSize:"11px",
+                      background: i % 2 === 0 ? "#fff" : "#fafafa",
+                    };
                     return (
-                      <tr key={m.id} style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                        <td style={{ padding:"10px 12px", border:"1px solid #e5e7eb", color:"#374151", fontWeight:500 }}>
-                          {project.name}
-                        </td>
-                        <td style={{ padding:"10px 12px", border:"1px solid #e5e7eb", color:"#111827", fontWeight:600, maxWidth:200 }}>
+                      <tr key={m.id}>
+                        <td style={cellStyle}>{project.name}</td>
+                        <td style={{ ...cellStyle, fontWeight:600, color:"#111827" }}>
                           {m.title}
-                          {m.work_completed && <div style={{ fontSize:"10px", color:"#6b7280", marginTop:2 }}>{m.work_completed}</div>}
+                          {m.work_completed && <div style={{ fontSize:"10px", color:"#6b7280", marginTop:3, fontWeight:400 }}>{m.work_completed}</div>}
                         </td>
-                        <td style={{ padding:"10px 12px", border:"1px solid #e5e7eb" }}>
+                        <td style={cellStyle}>
                           <span style={{
-                            display:"inline-block", padding:"2px 7px", borderRadius:4,
-                            fontSize:"10px", fontWeight:700, letterSpacing:".04em",
+                            display:"inline-block", padding:"3px 8px", borderRadius:4,
+                            fontSize:"10px", fontWeight:700, letterSpacing:".03em",
                             textTransform:"uppercase", background:s.bg, color:s.color,
-                            border:`1px solid ${s.border}`,
+                            border:`1px solid ${s.border}`, whiteSpace:"nowrap",
                           }}>{s.label}</span>
                         </td>
-                        <td style={{ padding:"10px 12px", border:"1px solid #e5e7eb", color:"#374151" }}>{m.owner_name||"-"}</td>
-                        <td style={{ padding:"10px 12px", border:"1px solid #e5e7eb", color:"#374151" }}>{m.stakeholder_dependency||"-"}</td>
-                        <td style={{ padding:"10px 12px", border:"1px solid #e5e7eb", color:"#374151" }}>{m.next_milestone_desc||"-"}</td>
-                        <td style={{ padding:"10px 12px", border:"1px solid #e5e7eb", color:"#374151", fontFamily:"monospace", whiteSpace:"nowrap" }}>
+                        <td style={cellStyle}>{m.owner||"-"}</td>
+                        <td style={cellStyle}>{m.stakeholder_dependency||"-"}</td>
+                        <td style={cellStyle}>{m.next_milestone_desc||"-"}</td>
+                        <td style={{ ...cellStyle, fontFamily:"monospace", fontSize:"11px", whiteSpace:"nowrap" }}>
                           {m.committed_date||"-"}
                         </td>
-                        <td style={{ padding:"10px 12px", border:"1px solid #e5e7eb", color:"#374151", fontFamily:"monospace", whiteSpace:"nowrap" }}>
+                        <td style={{ ...cellStyle, fontFamily:"monospace", fontSize:"11px", whiteSpace:"nowrap" }}>
                           {m.final_completion_date||"-"}
                         </td>
-                        <td style={{ padding:"10px 12px", border:"1px solid #e5e7eb", color:"#374151", maxWidth:220 }}>
+                        <td style={cellStyle}>
                           {m.blocker && <div><strong style={{ color:"#dc2626" }}>Blocker: </strong>{m.blocker}</div>}
-                          {m.recovery_action && <div style={{ marginTop:2 }}><strong style={{ color:"#4f46e5" }}>Action: </strong>{m.recovery_action}</div>}
+                          {m.recovery_action && <div style={{ marginTop:3 }}><strong style={{ color:"#4f46e5" }}>Action: </strong>{m.recovery_action}</div>}
                           {!m.blocker && !m.recovery_action && "-"}
                         </td>
                       </tr>
@@ -1019,12 +1127,12 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
         )}
 
         {/* Legend */}
-        <div className="flex flex-wrap gap-3 px-5 pb-5">
+        <div className="flex flex-wrap gap-3 px-5 py-3 border-t border-gray-100 bg-gray-50">
           {MS_SORT_ORDER.map(key => {
             const s = MS_STATUS[key];
             return (
               <span key={key} style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:11 }}>
-                <span style={{ width:10, height:10, borderRadius:2, background:s.bg, border:`1px solid ${s.border}`, display:"inline-block" }} />
+                <span style={{ width:10, height:10, borderRadius:2, background:s.bg, border:`1px solid ${s.border}`, display:"inline-block", flexShrink:0 }} />
                 <span style={{ color:s.color, fontWeight:600 }}>{s.label}</span>
               </span>
             );
@@ -1043,44 +1151,58 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
 }
 
 
-function buildMilestoneHtml(project, milestones, filterMode, filterField, fromDate, toDate) {
-  const rangeNote = filterMode === "range"
-    ? ` · ${filterField === "committed_date" ? "Committed" : "Final Closure"}: ${fromDate} to ${toDate}`
-    : " · All Milestones";
+function buildMilestoneHtml(project, milestones) {
+  const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  const rows = milestones.map(m => {
+  const rows = milestones.map((m, i) => {
     const s = MS_STATUS[m.status] || MS_STATUS.ON_TRACK;
+    const bg = i % 2 === 0 ? "#ffffff" : "#f8fafc";
+    const cell = `padding:8px 10px;border:1px solid #e2e8f0;vertical-align:top;word-break:break-word;white-space:normal;font-size:10.5px;background:${bg};color:#334155`;
+    const dateCell = `padding:8px 10px;border:1px solid #e2e8f0;vertical-align:top;font-family:monospace;font-size:10.5px;white-space:nowrap;background:${bg};color:#334155`;
     return `<tr>
-      <td style="padding:9px;border:1px solid #ddd">${project.name}</td>
-      <td style="padding:9px;border:1px solid #ddd;font-weight:600">${m.title}${m.work_completed ? `<br><small style="color:#666">${m.work_completed}</small>` : ""}</td>
-      <td style="padding:9px;border:1px solid #ddd"><span style="background:${s.bg};color:${s.color};padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700;border:1px solid ${s.border}">${s.label}</span></td>
-      <td style="padding:9px;border:1px solid #ddd">${m.owner_name||"-"}</td>
-      <td style="padding:9px;border:1px solid #ddd">${m.stakeholder_dependency||"-"}</td>
-      <td style="padding:9px;border:1px solid #ddd">${m.next_milestone_desc||"-"}</td>
-      <td style="padding:9px;border:1px solid #ddd;font-family:monospace">${m.committed_date||"-"}</td>
-      <td style="padding:9px;border:1px solid #ddd;font-family:monospace">${m.final_completion_date||"-"}</td>
-      <td style="padding:9px;border:1px solid #ddd">${m.blocker?`<b style="color:#dc2626">Blocker:</b> ${m.blocker}<br>`:""}${m.recovery_action?`<b style="color:#4f46e5">Action:</b> ${m.recovery_action}`:""}${!m.blocker&&!m.recovery_action?"-":""}</td>
+      <td style="${cell}">${esc(project.name)}</td>
+      <td style="${cell};font-weight:600;color:#0f172a">${esc(m.title)}${m.work_completed ? `<br><span style="font-size:9.5px;color:#64748b;font-weight:400">${esc(m.work_completed)}</span>` : ""}</td>
+      <td style="${cell}"><span style="display:inline-block;padding:3px 6px;border-radius:3px;font-size:9.5px;font-weight:700;text-transform:uppercase;white-space:nowrap;background:${s.bg};color:${s.color};border:1px solid ${s.border}">${s.label}</span></td>
+      <td style="${cell}">${esc(m.owner) || "-"}</td>
+      <td style="${cell}">${esc(m.stakeholder_dependency) || "-"}</td>
+      <td style="${cell}">${esc(m.next_milestone_desc) || "-"}</td>
+      <td style="${dateCell}">${esc(m.committed_date) || "-"}</td>
+      <td style="${dateCell}">${esc(m.final_completion_date) || "-"}</td>
+      <td style="${cell}">${m.blocker ? `<b style="color:#dc2626">Blocker:</b> ${esc(m.blocker)}<br>` : ""}${m.recovery_action ? `<b style="color:#4f46e5">Action:</b> ${esc(m.recovery_action)}` : ""}${!m.blocker && !m.recovery_action ? "-" : ""}</td>
     </tr>`;
   }).join("");
 
-  return `<html><head><style>
-    body{font-family:Arial,sans-serif;font-size:12px;margin:24px}
-    h2{margin-bottom:4px;font-size:16px} p{color:#666;font-size:11px;margin-bottom:16px}
-    table{width:100%;border-collapse:collapse}
-    th{padding:9px;border:1px solid #ccc;font-weight:700;background:#f1f5f9;font-size:11px;text-align:left}
-    @media print{body{margin:8px}}
-  </style></head><body>
-    <h2>${project.name} — Milestone Status Report</h2>
-    <p>${new Date().toLocaleDateString()}${rangeNote} · Sorted: Completed → On Track → At Risk → Delayed</p>
-    <table>
-      <thead><tr>
-        <th>Project</th><th>Open Item</th><th>Status</th><th>Owner</th>
-        <th>Dependency</th><th>Next Milestone</th><th>Committed Date</th>
-        <th>Final Closure Date</th><th>Risk / Blocker &amp; Action</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </body></html>`;
+  const thStyle = "padding:8px 10px;border:1px solid #cbd5e1;font-weight:700;background:#f1f5f9;color:#1e293b;font-size:10.5px;text-align:left;vertical-align:bottom;word-break:break-word";
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  @page { size: landscape; margin: 10mm; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; margin: 10px; color: #1e293b; }
+  h2 { font-size: 16px; margin-bottom: 4px; color: #0f172a; }
+  p { color: #64748b; font-size: 11px; margin: 0 0 14px; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  @media print { body { margin: 8px; } tr { page-break-inside: avoid; } }
+</style></head><body>
+  <h2>${esc(project.name)} — Milestone Status Report</h2>
+  <p>Generated on ${new Date().toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" })}</p>
+  <table>
+    <colgroup>
+      <col style="width:10%"><col style="width:18%"><col style="width:8%">
+      <col style="width:9%"><col style="width:10%"><col style="width:11%">
+      <col style="width:10%"><col style="width:10%"><col style="width:14%">
+    </colgroup>
+    <thead><tr>
+      <th style="${thStyle}">Project</th>
+      <th style="${thStyle}">Open Item</th>
+      <th style="${thStyle}">Status</th>
+      <th style="${thStyle}">Owner</th>
+      <th style="${thStyle}">Dependency</th>
+      <th style="${thStyle}">Next Milestone</th>
+      <th style="${thStyle}">Committed Date</th>
+      <th style="${thStyle}">Final Closure Date</th>
+      <th style="${thStyle}">Risk / Blocker &amp; Action</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</body></html>`;
 }
-
-
