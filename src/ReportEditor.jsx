@@ -814,8 +814,8 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
   useEffect(() => {
     if (projectScope === "all" && allProjects.length === 0) {
       setAllProjectsLoading(true);
-      api.projects()
-        .then(data => setAllProjects(data || []))
+      api.projects("?no_page=1")
+        .then(data => setAllProjects(Array.isArray(data) ? data : (data?.results || [])))
         .catch(console.error)
         .finally(() => setAllProjectsLoading(false));
     }
@@ -833,7 +833,8 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
     if (projectScope === "current") {
       return milestones.map(m => ({ ...m, project_name: project.name }));
     }
-    return allProjects.flatMap(p => (p.milestones || []).map(m => ({ ...m, project_name: p.name })));
+    const projectList = Array.isArray(allProjects) ? allProjects : (allProjects?.results || []);
+    return projectList.flatMap(p => (p.milestones || []).map(m => ({ ...m, project_name: p.name })));
   }, [projectScope, milestones, project.name, allProjects]);
 
   /* ── Filtered + sorted milestones ─────────────────────────── */
