@@ -806,6 +806,21 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState("");
 
+  /* ── Project Scope ─────────────────────────────────────────── */
+  const [projectScope, setProjectScope] = useState("current"); // "current" | "all"
+  const [allProjects, setAllProjects] = useState([]);
+  const [allProjectsLoading, setAllProjectsLoading] = useState(false);
+
+  useEffect(() => {
+    if (projectScope === "all" && allProjects.length === 0) {
+      setAllProjectsLoading(true);
+      api.projects()
+        .then(data => setAllProjects(data || []))
+        .catch(console.error)
+        .finally(() => setAllProjectsLoading(false));
+    }
+  }, [projectScope, allProjects.length]);
+
   /* ── Date range filter ─────────────────────────────────────── */
   const [filterMode, setFilterMode] = useState("all");    // "all" | "range"
   const [filterField, setFilterField] = useState("committed_date"); // "committed_date" | "final_completion_date"
@@ -813,9 +828,17 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
   const [toDate, setToDate] = useState(today);
   const [filterStatus, setFilterStatus] = useState("");   // "" | ON_TRACK | AT_RISK | DELAYED | COMPLETED
 
+  /* ── Combined milestones ───────────────────────────────────── */
+  const baseMilestones = useMemo(() => {
+    if (projectScope === "current") {
+      return milestones.map(m => ({ ...m, project_name: project.name }));
+    }
+    return allProjects.flatMap(p => (p.milestones || []).map(m => ({ ...m, project_name: p.name })));
+  }, [projectScope, milestones, project.name, allProjects]);
+
   /* ── Filtered + sorted milestones ─────────────────────────── */
   const filteredMilestones = useMemo(() => {
-    let list = [...milestones];
+    let list = [...baseMilestones];
 
     // Date range filter
     if (filterMode === "range") {
@@ -831,15 +854,17 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
 
     // Sort: Completed → On Track → At Risk → Delayed
     return sortMilestones(list);
-  }, [milestones, filterMode, filterField, fromDate, toDate, filterStatus]);
+  }, [baseMilestones, filterMode, filterField, fromDate, toDate, filterStatus]);
 
   const handlePrint = () => window.print();
+
+  const docTitle = projectScope === "all" ? "All Open Projects" : project.name;
 
   const handlePdf = async () => {
     setPdfBusy(true); setErr("");
     try {
-      const html = buildMilestoneHtml(project, filteredMilestones);
-      await api.milestoneReportPdf(project.name, html);
+      const html = buildMilestoneHtml(project, filteredMilestones, docTitle);
+      await api.milestoneReportPdf(docTitle, html);
     } catch (e) {
       console.error("Milestone PDF error:", e);
       setErr(e.message || "PDF generation failed.");
@@ -850,8 +875,11 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
   const handleGetLink = async () => {
     setLinkBusy(true); setErr(""); setSharedLink(null);
     try {
-      const html = buildMilestoneHtml(project, filteredMilestones);
-      const data = await api.shareLink(projectId, null, { type: "milestones", html });
+      const html = buildMilestoneHtml(project, filteredMilestones, docTitle);
+      const data = await api.shareLink(projectId, null, {
+        type: projectScope === "all" ? "milestones_all" : "milestones",
+        html
+      });
       setSharedLink(data.link);
       setShowSharePanel(true);
     } catch (e) {
@@ -868,6 +896,21 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-5 py-4">
         <div className="flex flex-wrap items-end gap-4 justify-between">
           <div className="flex flex-wrap items-end gap-3">
+
+            {/* Projects Scope selector */}
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Projects</label>
+              <div className="flex rounded-lg overflow-hidden border border-gray-300">
+                <button onClick={() => setProjectScope("current")}
+                  className={`px-3 py-1.5 text-xs font-semibold transition-colors ${projectScope === "current" ? "bg-indigo-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+                  {project.name}
+                </button>
+                <button onClick={() => setProjectScope("all")}
+                  className={`px-3 py-1.5 text-xs font-semibold transition-colors ${projectScope === "all" ? "bg-indigo-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+                  All Open Projects
+                </button>
+              </div>
+            </div>
 
             {/* Show mode */}
             <div>
@@ -980,7 +1023,12 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden" id="ms-report-table">
         <div className="px-5 pt-4 pb-3 border-b border-gray-100">
           <div className="text-xs font-bold text-gray-900 flex items-center gap-2">
-            <Target size={14} style={{ color: INDIGO }} /> {project.name} — Milestone Status Report
+            <Target size={14} style={{ color: INDIGO }} /> {docTitle} — Milestone Status Report
+            {projectScope === "all" && allProjectsLoading && (
+              <span className="text-xs text-indigo-600 font-normal flex items-center gap-1 ml-2">
+                <Loader2 size={12} className="animate-spin" /> Loading all open projects...
+              </span>
+            )}
           </div>
         </div>
 
@@ -1052,7 +1100,7 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
                     };
                     return (
                       <tr key={m.id}>
-                        <td style={cellStyle}>{project.name}</td>
+                        <td style={{ ...cellStyle, fontWeight:600 }}>{m.project_name || project.name}</td>
                         <td style={{ ...cellStyle, fontWeight:600, color:"#111827" }}>
                           {m.title}
                           {m.work_completed && <div style={{ fontSize:"10px", color:"#6b7280", marginTop:3, fontWeight:400 }}>{m.work_completed}</div>}
@@ -1112,7 +1160,7 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
   );
 }
 
-function buildMilestoneHtml(project, milestones) {
+function buildMilestoneHtml(project, milestones, docTitle) {
   const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   const rows = milestones.map((m, i) => {
@@ -1141,7 +1189,7 @@ function buildMilestoneHtml(project, milestones) {
 
     // Build row with explicit concatenation to avoid any template parsing edge cases
     let rowHtml = `<tr>`;
-    rowHtml += `<td style="${cell}">${esc(project.name)}</td>`;
+    rowHtml += `<td style="${cell}">${esc(m.project_name || project.name)}</td>`;
     rowHtml += `<td style="${cell};font-weight:600;color:#0f172a">${esc(m.title)}${workHtml}</td>`;
     rowHtml += `<td style="${cell}">${statusPill}</td>`;
     rowHtml += `<td style="${cell}">${esc(m.owner || "-")}</td>`;
@@ -1165,7 +1213,7 @@ function buildMilestoneHtml(project, milestones) {
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   @media print { body { margin: 8px; } tr { page-break-inside: avoid; } }
 </style></head><body>
-  <h2>${esc(project.name)} - Milestone Status Report</h2>
+  <h2>${esc(docTitle || project.name)} — Milestone Status Report</h2>
   <p>Generated on ${new Date().toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" })}</p>
   <table>
     <colgroup>
