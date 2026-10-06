@@ -1,25 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Pencil, Trash2, CheckCircle2, AlertTriangle, Clock, Target, Layers, X, Copy, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Layers, X, Copy, Check, Target } from "lucide-react";
 import { api } from "./api";
-
-const STATUS_ORDER = ["COMPLETED", "ON_TRACK", "AT_RISK", "DELAYED"];
-
-const STATUS_COLORS = {
-  ON_TRACK:  "bg-green-100 text-green-800 border-green-200",
-  AT_RISK:   "bg-red-100 text-red-800 border-red-200",
-  DELAYED:   "bg-yellow-100 text-yellow-800 border-yellow-200",
-  COMPLETED: "bg-blue-100 text-blue-800 border-blue-200",
-};
-const STATUS_LABELS = {
-  ON_TRACK: "On Track", AT_RISK: "At Risk",
-  DELAYED: "Delayed",   COMPLETED: "Completed",
-};
-const STATUS_ICONS = {
-  ON_TRACK:  <CheckCircle2 size={12} className="mr-1" />,
-  AT_RISK:   <AlertTriangle size={12} className="mr-1" />,
-  DELAYED:   <Clock size={12} className="mr-1" />,
-  COMPLETED: <Target size={12} className="mr-1" />,
-};
+import { MS_SORT_ORDER, getStatusConfig, sortMilestones } from "./milestoneConstants";
 
 const emptyRow = (projectId) => ({
   _id: Math.random().toString(36).slice(2),
@@ -66,10 +48,10 @@ function InlineEditRow({ m, onSave, onDelete }) {
         {/* Status */}
         <td className="px-3 py-2">
           <select value={draft.status} onChange={f("status")} className={cellCls}>
-            <option value="ON_TRACK">On Track</option>
-            <option value="AT_RISK">At Risk</option>
-            <option value="DELAYED">Delayed</option>
-            <option value="COMPLETED">Completed</option>
+            {MS_SORT_ORDER.map(key => {
+              const s = getStatusConfig(key);
+              return <option key={key} value={key}>{s.label}</option>;
+            })}
           </select>
         </td>
         {/* Owner — plain text */}
@@ -122,9 +104,14 @@ function InlineEditRow({ m, onSave, onDelete }) {
         {m.work_completed && <div className="text-xs text-gray-500 mt-0.5">{m.work_completed}</div>}
       </td>
       <td className="px-4 py-3">
-        <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${STATUS_COLORS[m.status]}`}>
-          {STATUS_ICONS[m.status]} {STATUS_LABELS[m.status]}
-        </span>
+        {(() => {
+          const s = getStatusConfig(m.status);
+          return (
+            <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${s.tailwind}`}>
+              {s.icon} {s.label}
+            </span>
+          );
+        })()}
       </td>
       <td className="px-4 py-3 text-xs font-medium text-gray-700">{m.owner || "-"}</td>
       <td className="px-4 py-3 text-xs text-gray-600">{m.stakeholder_dependency || "-"}</td>
@@ -164,10 +151,7 @@ export default function MilestonesView({ projectId, project }) {
     setLoading(true);
     try {
       const data = await api.getMilestones(projectId);
-      const sorted = [...(data || [])].sort(
-        (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status)
-      );
-      setMilestones(sorted);
+      setMilestones(sortMilestones(data || []));
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -313,10 +297,10 @@ function MilestoneModal({ projectId, onClose, onSaved }) {
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">Status</label>
               <select name="status" value={form.status} onChange={f} className={inp}>
-                <option value="ON_TRACK">On Track</option>
-                <option value="AT_RISK">At Risk</option>
-                <option value="DELAYED">Delayed</option>
-                <option value="COMPLETED">Completed</option>
+                {MS_SORT_ORDER.map(key => {
+                  const s = getStatusConfig(key);
+                  return <option key={key} value={key}>{s.label}</option>;
+                })}
               </select>
             </div>
             <div>
@@ -432,10 +416,10 @@ function BulkMilestoneModal({ projectId, onClose, onSaved }) {
               <input type="text" placeholder="Open item *" value={row.title}
                 onChange={e => updateRow(idx, "title", e.target.value)} className={inp} />
               <select value={row.status} onChange={e => updateRow(idx, "status", e.target.value)} className={inp}>
-                <option value="ON_TRACK">On Track</option>
-                <option value="AT_RISK">At Risk</option>
-                <option value="DELAYED">Delayed</option>
-                <option value="COMPLETED">Completed</option>
+                {MS_SORT_ORDER.map(key => {
+                  const s = getStatusConfig(key);
+                  return <option key={key} value={key}>{s.label}</option>;
+                })}
               </select>
               <input type="text" placeholder="Owner name" value={row.owner || ""}
                 onChange={e => updateRow(idx, "owner", e.target.value)} className={inp} />

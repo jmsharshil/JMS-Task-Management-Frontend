@@ -9,15 +9,14 @@
  *  • Actions: Download PDF · Copy text · Download TXT · Get shareable link · Email
  */
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   FileText, Download, Mail, Copy, Link2, Loader2, CheckCircle2, Circle,
-  Eye, Pencil, RefreshCw, ChevronDown, ChevronRight, Filter, Search,
-  Sparkles, X, CheckSquare, Square, Calendar, User, Tag, BarChart2,
-  Send, ExternalLink, Save, RotateCcw, Layers, Clock, AlertCircle, Target,
-  CheckCircle, AlertTriangle, Hourglass
+  Eye, Pencil, RefreshCw, Filter, Search, X, CheckSquare, Square, Tag,
+  Send, ExternalLink, Save, RotateCcw, Layers, AlertCircle, Target
 } from "lucide-react";
 import { api, getToken } from "./api";
+import { MS_SORT_ORDER, getStatusConfig, sortMilestones } from "./milestoneConstants";
 
 /* ─── colours (mirrors App.jsx) ─────────────────────────────── */
 const RED = "#D6222A";
@@ -797,17 +796,6 @@ export default function ReportEditor({ projectId, project, tasks: projectTasks }
 /* ════════════════════════════════════════════════════════════════
    MILESTONE REPORT PANEL
 ════════════════════════════════════════════════════════════════ */
-const MS_STATUS = {
-  ON_TRACK:  { label: "On Track",  bg: "#dcfce7", color: "#166534", border: "#bbf7d0" },
-  AT_RISK:   { label: "At Risk",   bg: "#fee2e2", color: "#991b1b", border: "#fecaca" },
-  DELAYED:   { label: "Delayed",   bg: "#fef9c3", color: "#854d0e", border: "#fef08a" },
-  COMPLETED: { label: "Completed", bg: "#dbeafe", color: "#1e40af", border: "#bfdbfe" },
-};
-
-/* Sort: Completed first, then On Track, At Risk, Delayed */
-const MS_SORT_ORDER = ["COMPLETED", "ON_TRACK", "AT_RISK", "DELAYED"];
-const sortMilestones = (list) =>
-  [...list].sort((a, b) => MS_SORT_ORDER.indexOf(a.status) - MS_SORT_ORDER.indexOf(b.status));
 
 function MilestoneReportPanel({ projectId, project, milestones, loading }) {
   const today = new Date().toISOString().slice(0, 10);
@@ -826,7 +814,7 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
   const [filterStatus, setFilterStatus] = useState("");   // "" | ON_TRACK | AT_RISK | DELAYED | COMPLETED
 
   /* ── Filtered + sorted milestones ─────────────────────────── */
-  const filteredMilestones = React.useMemo(() => {
+  const filteredMilestones = useMemo(() => {
     let list = [...milestones];
 
     // Date range filter
@@ -895,10 +883,6 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
     setLinkBusy(false);
   };
 
-  const rangeLabel = filterMode === "range"
-    ? ` · ${filterField === "committed_date" ? "Committed" : "Final Closure"}: ${fromDate} → ${toDate}`
-    : " · All Milestones";
-
   return (
     <div className="flex flex-col gap-4">
 
@@ -950,10 +934,10 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
               <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-2 text-xs bg-white font-semibold text-gray-700 focus:ring-2 focus:ring-indigo-200 outline-none">
                 <option value="">All Statuses</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="ON_TRACK">On Track</option>
-                <option value="AT_RISK">At Risk</option>
-                <option value="DELAYED">Delayed</option>
+                {MS_SORT_ORDER.map(key => {
+                  const s = getStatusConfig(key);
+                  return <option key={key} value={key}>{s.label}</option>;
+                })}
               </select>
             </div>
           </div>
@@ -1076,9 +1060,9 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
                   </tr>
                 ) : (
                   filteredMilestones.map((m, i) => {
-                    const s = MS_STATUS[m.status] || MS_STATUS.ON_TRACK;
+                    const s = getStatusConfig(m.status);
                     const cellStyle = {
-                      padding:"10px 12px",
+
                       border:"1px solid #e5e7eb",
                       color:"#374151",
                       verticalAlign:"top",
@@ -1129,7 +1113,7 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
         {/* Legend */}
         <div className="flex flex-wrap gap-3 px-5 py-3 border-t border-gray-100 bg-gray-50">
           {MS_SORT_ORDER.map(key => {
-            const s = MS_STATUS[key];
+            const s = getStatusConfig(key);
             return (
               <span key={key} style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:11 }}>
                 <span style={{ width:10, height:10, borderRadius:2, background:s.bg, border:`1px solid ${s.border}`, display:"inline-block", flexShrink:0 }} />
@@ -1138,38 +1122,58 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
             );
           })}
         </div>
-      </div>
 
-      {err && (
-        <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-          <AlertCircle size={13} className="shrink-0" /> {err}
-          <button onClick={() => setErr("")} className="ml-auto text-red-400 hover:text-red-700"><X size={12} /></button>
-        </div>
-      )}
+        {err && (
+          <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <AlertCircle size={13} className="shrink-0" /> {err}
+            <button onClick={() => setErr("")} className="ml-auto text-red-400 hover:text-red-700"><X size={12} /></button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
-
 
 function buildMilestoneHtml(project, milestones) {
   const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   const rows = milestones.map((m, i) => {
-    const s = MS_STATUS[m.status] || MS_STATUS.ON_TRACK;
+    const s = getStatusConfig(m.status);
     const bg = i % 2 === 0 ? "#ffffff" : "#f8fafc";
     const cell = `padding:8px 10px;border:1px solid #e2e8f0;vertical-align:top;word-break:break-word;white-space:normal;font-size:10.5px;background:${bg};color:#334155`;
     const dateCell = `padding:8px 10px;border:1px solid #e2e8f0;vertical-align:top;font-family:monospace;font-size:10.5px;white-space:nowrap;background:${bg};color:#334155`;
-    return `<tr>
-      <td style="${cell}">${esc(project.name)}</td>
-      <td style="${cell};font-weight:600;color:#0f172a">${esc(m.title)}${m.work_completed ? `<br><span style="font-size:9.5px;color:#64748b;font-weight:400">${esc(m.work_completed)}</span>` : ""}</td>
-      <td style="${cell}"><span style="display:inline-block;padding:3px 6px;border-radius:3px;font-size:9.5px;font-weight:700;text-transform:uppercase;white-space:nowrap;background:${s.bg};color:${s.color};border:1px solid ${s.border}">${s.label}</span></td>
-      <td style="${cell}">${esc(m.owner) || "-"}</td>
-      <td style="${cell}">${esc(m.stakeholder_dependency) || "-"}</td>
-      <td style="${cell}">${esc(m.next_milestone_desc) || "-"}</td>
-      <td style="${dateCell}">${esc(m.committed_date) || "-"}</td>
-      <td style="${dateCell}">${esc(m.final_completion_date) || "-"}</td>
-      <td style="${cell}">${m.blocker ? `<b style="color:#dc2626">Blocker:</b> ${esc(m.blocker)}<br>` : ""}${m.recovery_action ? `<b style="color:#4f46e5">Action:</b> ${esc(m.recovery_action)}` : ""}${!m.blocker && !m.recovery_action ? "-" : ""}</td>
-    </tr>`;
+
+    const statusPill = `<span style="display:inline-block;padding:3px 6px;border-radius:3px;font-size:9.5px;font-weight:700;text-transform:uppercase;white-space:nowrap;background:${s.bg};color:${s.color};border:1px solid ${s.border}">${s.label}</span>`;
+
+    let riskHtml = "";
+    if (m.blocker) {
+      riskHtml += `<b style="color:#dc2626">Blocker:</b> ${esc(m.blocker)}<br>`;
+    }
+    if (m.recovery_action) {
+      riskHtml += `<b style="color:#4f46e5">Action:</b> ${esc(m.recovery_action)}`;
+    }
+    if (!riskHtml) {
+      riskHtml = "-";
+    }
+
+    let workHtml = "";
+    if (m.work_completed) {
+      workHtml = `<br><span style="font-size:9.5px;color:#64748b;font-weight:400">${esc(m.work_completed)}</span>`;
+    }
+
+    // Build row with explicit concatenation to avoid any template parsing edge cases
+    let rowHtml = `<tr>`;
+    rowHtml += `<td style="${cell}">${esc(project.name)}</td>`;
+    rowHtml += `<td style="${cell};font-weight:600;color:#0f172a">${esc(m.title)}${workHtml}</td>`;
+    rowHtml += `<td style="${cell}">${statusPill}</td>`;
+    rowHtml += `<td style="${cell}">${esc(m.owner || "-")}</td>`;
+    rowHtml += `<td style="${cell}">${esc(m.stakeholder_dependency || "-")}</td>`;
+    rowHtml += `<td style="${cell}">${esc(m.next_milestone_desc || "-")}</td>`;
+    rowHtml += `<td style="${dateCell}">${esc(m.committed_date || "-")}</td>`;
+    rowHtml += `<td style="${dateCell}">${esc(m.final_completion_date || "-")}</td>`;
+    rowHtml += `<td style="${cell}">${riskHtml}</td>`;
+    rowHtml += `</tr>`;
+    return rowHtml;
   }).join("");
 
   const thStyle = "padding:8px 10px;border:1px solid #cbd5e1;font-weight:700;background:#f1f5f9;color:#1e293b;font-size:10.5px;text-align:left;vertical-align:bottom;word-break:break-word";
@@ -1183,7 +1187,7 @@ function buildMilestoneHtml(project, milestones) {
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   @media print { body { margin: 8px; } tr { page-break-inside: avoid; } }
 </style></head><body>
-  <h2>${esc(project.name)} — Milestone Status Report</h2>
+  <h2>${esc(project.name)} - Milestone Status Report</h2>
   <p>Generated on ${new Date().toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" })}</p>
   <table>
     <colgroup>
