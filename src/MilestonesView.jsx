@@ -74,7 +74,7 @@ function InlineEditRow({ m, onSave, onDelete }) {
         </td>
         {/* Owner — plain text */}
         <td className="px-3 py-2">
-          <input value={draft.owner} onChange={f("owner")} className={cellCls} placeholder="Owner name" />
+          <input value={draft.owner || ""} onChange={f("owner")} className={cellCls} placeholder="Owner name" />
         </td>
         {/* Dependency */}
         <td className="px-3 py-2">
@@ -320,8 +320,8 @@ function MilestoneModal({ projectId, onClose, onSaved }) {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Owner (Client Contact)</label>
-              <input type="text" name="owner" value={form.owner} onChange={f} placeholder="e.g. John Smith" className={inp} />
+              <label className="block text-xs font-bold text-gray-700 mb-1">Owner (Client Contact / Responsible Party)</label>
+              <input type="text" name="owner" value={form.owner || ""} onChange={f} placeholder="e.g. John Smith" className={inp} />
             </div>
           </div>
           <div>
@@ -437,7 +437,7 @@ function BulkMilestoneModal({ projectId, onClose, onSaved }) {
                 <option value="DELAYED">Delayed</option>
                 <option value="COMPLETED">Completed</option>
               </select>
-              <input type="text" placeholder="Owner name" value={row.owner}
+              <input type="text" placeholder="Owner name" value={row.owner || ""}
                 onChange={e => updateRow(idx, "owner", e.target.value)} className={inp} />
               <input type="date" value={row.committed_date}
                 onChange={e => updateRow(idx, "committed_date", e.target.value)} className={inp} />
