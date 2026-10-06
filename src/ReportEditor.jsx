@@ -15,7 +15,7 @@ import {
   Eye, Pencil, RefreshCw, Filter, Search, X, CheckSquare, Square, Tag,
   Send, ExternalLink, Save, RotateCcw, Layers, AlertCircle, Target
 } from "lucide-react";
-import { api, getToken } from "./api";
+import { api, getToken, BASE } from "./api";
 import { MS_SORT_ORDER, getStatusConfig, sortMilestones } from "./milestoneConstants";
 
 /* ─── colours (mirrors App.jsx) ─────────────────────────────── */
@@ -839,22 +839,9 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
     setPdfBusy(true); setErr("");
     try {
       const html = buildMilestoneHtml(project, filteredMilestones);
-      const token = getToken() || "";
-      const res = await fetch(`/api/milestone-report-pdf/`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ html, project_name: project.name }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || `PDF generation failed (${res.status})`);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = `${project.name.replace(/\s+/g,"_")}_milestones.pdf`;
-      a.click(); URL.revokeObjectURL(url);
+      await api.milestoneReportPdf(project.name, html);
     } catch (e) {
+      console.error("Milestone PDF error:", e);
       setErr(e.message || "PDF generation failed.");
     }
     setPdfBusy(false);
@@ -864,20 +851,11 @@ function MilestoneReportPanel({ projectId, project, milestones, loading }) {
     setLinkBusy(true); setErr(""); setSharedLink(null);
     try {
       const html = buildMilestoneHtml(project, filteredMilestones);
-      const token = getToken() || "";
-      const res = await fetch(`/api/projects/${projectId}/share-link/`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "milestones", html }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || `Link generation failed (${res.status})`);
-      }
-      const data = await res.json();
+      const data = await api.shareLink(projectId, null, { type: "milestones", html });
       setSharedLink(data.link);
       setShowSharePanel(true);
     } catch (e) {
+      console.error("Milestone share link error:", e);
       setErr(e.message || "Failed to generate share link.");
     }
     setLinkBusy(false);

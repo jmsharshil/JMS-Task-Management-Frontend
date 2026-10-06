@@ -50,7 +50,12 @@ export const api = {
   adjust: (id, formData) => request(`/projects/${id}/adjust/`, { method: "POST", body: formData, form: true }),
   generateArchitecture: (formData) => request("/projects/generate-architecture/", { method: "POST", body: formData, form: true }),
   approveArchitecture: (formData) => request("/projects/approve-architecture/", { method: "POST", body: formData, form: true }),
-  shareLink: (id, params) => request(`/projects/${id}/share-link/?${new URLSearchParams(params).toString()}`),
+  shareLink: (id, params, body = null) => {
+    if (body !== null) {
+      return request(`/projects/${id}/share-link/`, { method: "POST", body });
+    }
+    return request(`/projects/${id}/share-link/?${new URLSearchParams(params).toString()}`);
+  },
   report: (id, week) => request(`/projects/${id}/report/?week=${week}`),
   emailReport: (id, week, recipients = "", text = "") =>
     request(`/projects/${id}/report/email/`, { method: "POST", body: { week, email: recipients, text } }),
@@ -163,6 +168,25 @@ export const api = {
   createMilestone: (data) => request("/milestones/", { method: "POST", body: data }),
   updateMilestone: (id, data) => request(`/milestones/${id}/`, { method: "PATCH", body: data }),
   deleteMilestone: (id) => request(`/milestones/${id}/`, { method: "DELETE" }),
+  milestoneReportPdf: async (projectName, html) => {
+    const token = getToken() || "";
+    const res = await fetch(`${BASE}/milestone-report-pdf/`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ html, project_name: projectName }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || `PDF generation failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${projectName.replace(/\s+/g, "_")}_milestones.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 
   // MOMs
   moms: (projectId) => request(`/projects/${projectId}/moms/`),
