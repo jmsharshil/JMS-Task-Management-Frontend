@@ -58,6 +58,8 @@ const Spinner = ({ text }) => (
 export default function App() {
   const [me, setMe] = useState(null);
   const [booting, setBooting] = useState(true);
+  const [globalCat, setGlobalCat] = useState(null);
+  const [globalNType, setGlobalNType] = useState("VOICE");
 
   useEffect(() => {
     (async () => {
@@ -68,13 +70,70 @@ export default function App() {
     })();
   }, []);
 
-  const signOut = () => { setToken(null); setMe(null); };
+  const signOut = () => { setToken(null); setMe(null); setGlobalCat(null); };
 
   if (booting) return <div className="f-body min-h-screen bg-gray-50 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin mr-2" size={18} /> Loading…</div>;
   if (!me) return <Login onLogin={setMe} />;
+  
+  if (!globalCat) {
+    return <CategorySelect onSelect={(c, t) => { setGlobalCat(c); setGlobalNType(t); }} onSignOut={signOut} />;
+  }
+
   return (
     <div className="f-body min-h-screen bg-gray-50 text-gray-900">
-      {me.role === "ADMIN" ? <AdminShell me={me} signOut={signOut} /> : <DevShell me={me} signOut={signOut} />}
+      {me.role === "ADMIN" ? (
+        <AdminShell me={me} signOut={signOut} category={globalCat} naavyaType={globalNType} onBack={() => setGlobalCat(null)} />
+      ) : (
+        <DevShell me={me} signOut={signOut} category={globalCat} naavyaType={globalNType} onBack={() => setGlobalCat(null)} />
+      )}
+    </div>
+  );
+}
+
+/* ================= CATEGORY SELECT ================= */
+function CategorySelect({ onSelect, onSignOut }) {
+  const [cat, setCat] = useState("JMS");
+  const [ntype, setNType] = useState("VOICE");
+  
+  return (
+    <div className="f-body min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
+      <div className="rail bg-white border border-gray-200 rounded-lg p-8 w-full max-w-md">
+        <div className="f-disp text-xs font-bold tracking-widest uppercase mb-1" style={{ color: RED }}>JMS Tech</div>
+        <h1 className="f-disp text-2xl font-bold mb-6" style={{ color: INK }}>Select Workspace</h1>
+        
+        <div className="space-y-3">
+          <button onClick={() => setCat("JMS")} className={`w-full p-4 rounded-lg border text-left flex items-center justify-between transition-colors ${cat === "JMS" ? "border-red-500 bg-red-50" : "border-gray-200 hover:border-gray-300"}`}>
+            <span className="font-semibold text-gray-900">JMS Projects</span>
+            {cat === "JMS" && <CheckCircle2 size={18} className="text-red-500" />}
+          </button>
+          
+          <button onClick={() => setCat("NAAVYA")} className={`w-full p-4 rounded-lg border text-left flex items-center justify-between transition-colors ${cat === "NAAVYA" ? "border-red-500 bg-red-50" : "border-gray-200 hover:border-gray-300"}`}>
+            <span className="font-semibold text-gray-900">Naavya AI</span>
+            {cat === "NAAVYA" && <CheckCircle2 size={18} className="text-red-500" />}
+          </button>
+          
+          {cat === "NAAVYA" && (
+            <div className="pl-6 space-y-2 border-l-2 border-red-200 ml-4 py-1">
+              <button onClick={() => setNType("VOICE")} className={`w-full px-3 py-2 text-sm rounded border text-left ${ntype === "VOICE" ? "bg-red-500 text-white border-red-500" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>Voice Only</button>
+              <button onClick={() => setNType("VOICE_WHATSAPP")} className={`w-full px-3 py-2 text-sm rounded border text-left ${ntype === "VOICE_WHATSAPP" ? "bg-red-500 text-white border-red-500" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>Voice + WhatsApp</button>
+              <button onClick={() => setNType("WHATSAPP")} className={`w-full px-3 py-2 text-sm rounded border text-left ${ntype === "WHATSAPP" ? "bg-red-500 text-white border-red-500" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>WhatsApp Only</button>
+            </div>
+          )}
+
+          <button onClick={() => setCat("DEMO")} className={`w-full p-4 rounded-lg border text-left flex items-center justify-between transition-colors ${cat === "DEMO" ? "border-red-500 bg-red-50" : "border-gray-200 hover:border-gray-300"}`}>
+            <span className="font-semibold text-gray-900">Demo</span>
+            {cat === "DEMO" && <CheckCircle2 size={18} className="text-red-500" />}
+          </button>
+        </div>
+        
+        <div className="mt-8">
+          <Btn className="w-full justify-center" onClick={() => onSelect(cat, ntype)}>Enter Workspace <ChevronRight size={16}/></Btn>
+        </div>
+        
+        <div className="mt-4 text-center">
+          <button onClick={onSignOut} className="text-xs text-gray-400 hover:text-gray-600 inline-flex items-center gap-1"><LogOut size={12}/> Sign out</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -429,7 +488,7 @@ function ChangePasswordModal({ onClose }) {
 }
 
 /* ================= ADMIN ================= */
-function AdminShell({ me, signOut }) {
+function AdminShell({ me, signOut, category, naavyaType, onBack }) {
   const [tab, setTab] = useState("dashboard");
   const [openId, setOpenId] = useState(null);
   const tabs = [
@@ -441,6 +500,9 @@ function AdminShell({ me, signOut }) {
   ];
   const [showChangePwd, setShowChangePwd] = useState(false);
   const [showOrgSettings, setShowOrgSettings] = useState(false);
+  
+  const workspaceLabel = category === "JMS" ? "JMS Projects" : category === "NAAVYA" ? `Naavya AI (${naavyaType === "VOICE_WHATSAPP" ? "Voice + WhatsApp" : naavyaType === "WHATSAPP" ? "WhatsApp Only" : "Voice Only"})` : "Demo";
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <header className="flex items-center justify-between mb-6">
@@ -450,8 +512,13 @@ function AdminShell({ me, signOut }) {
             <h1 className="f-disp text-xl font-bold leading-tight" style={{ color: INK }}>Delivery Hub</h1>
             <div className="f-disp text-[10px] font-bold tracking-widest uppercase leading-none" style={{ color: RED }}>JMS Tech</div>
           </div>
+          <div className="ml-4 pl-4 border-l border-gray-300">
+            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Workspace</div>
+            <div className="f-disp text-sm font-bold text-gray-900">{workspaceLabel}</div>
+          </div>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={onBack} className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold inline-flex items-center gap-1 mr-2"><RefreshCw size={12} /> Switch Workspace</button>
           {me?.is_admin && <button onClick={() => setShowOrgSettings(true)} className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1"><Settings size={13} /> Org Settings</button>}
           <button onClick={() => setShowChangePwd(true)} className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1" title="Change password">
             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="16" r="1" /><rect x="3" y="10" width="18" height="12" rx="2" /><path d="M7 10V7a5 5 0 0 1 10 0v3" /></svg>
@@ -471,21 +538,21 @@ function AdminShell({ me, signOut }) {
           </button>
         ))}
       </nav>
-      {tab === "dashboard" && <Dashboard onOpen={(id) => { setTab("projects"); setOpenId(id); }} />}
+      {tab === "dashboard" && <Dashboard onOpen={(id) => { setTab("projects"); setOpenId(id); }} category={category} naavyaType={naavyaType} />}
       {tab === "tasks" && <AdHocTasksTab me={me} isAdmin={true} />}
       {tab === "team" && <TeamTab />}
       {tab === "clients" && <ClientsTab />}
       {tab === "projects" && (openId
         ? <ProjectDetail projectId={openId} onBack={() => setOpenId(null)} />
-        : <ProjectsTab onOpen={setOpenId} />)}
+        : <ProjectsTab onOpen={setOpenId} category={category} naavyaType={naavyaType} />)}
     </div>
   );
 }
 
 /* ---------- Dashboard ---------- */
-function Dashboard({ onOpen }) {
+function Dashboard({ onOpen, category, naavyaType }) {
   const [data, setData] = useState(null);
-  useEffect(() => { api.dashboard().then(setData); }, []);
+  useEffect(() => { api.dashboard(category, naavyaType).then(setData); }, [category, naavyaType]);
   if (!data) return <Spinner text="Loading dashboard…" />;
 
   const { totals, projects, developers } = data;
@@ -727,20 +794,25 @@ function ClientsTab() {
 }
 
 /* ---------- Projects list + New ---------- */
-function ProjectsTab({ onOpen }) {
+function ProjectsTab({ onOpen, category, naavyaType }) {
   const [data, setData] = useState(null);
   const [creating, setCreating] = useState(false);
+  
   const load = (url = "") => api.projects(url).then(setData);
   useEffect(() => { load(); }, []);
 
-  if (creating) return <NewProject onDone={(p) => { setCreating(false); load(); if (p) onOpen(p.id); }} />;
+  if (creating) return <NewProject onDone={(p) => { setCreating(false); load(); if (p) onOpen(p.id); }} defaultCategory={category} defaultNaavyaType={naavyaType} />;
   if (!data) return <Spinner text="Loading projects…" />;
 
-  const projects = data.results || data;
+  const allProjects = data.results || data;
+  let projects = allProjects.filter(p => (p.category || "JMS") === category);
+  if (category === "NAAVYA") {
+    projects = projects.filter(p => p.project_type === naavyaType);
+  }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
         <h2 className="f-disp font-bold text-lg">Projects</h2>
         <Btn onClick={() => setCreating(true)}><Plus size={15} /> New project</Btn>
       </div>
@@ -771,9 +843,9 @@ function ProjectsTab({ onOpen }) {
   );
 }
 
-function NewProject({ onDone }) {
+function NewProject({ onDone, defaultCategory, defaultNaavyaType }) {
   const [team, setTeam] = useState([]); const [clients, setClients] = useState([]);
-  const [form, setForm] = useState({ name: "", client: "", ref: "", start_date: todayISO(), weeks: 8, current_week: 1 });
+  const [form, setForm] = useState({ name: "", client: "", ref: "", start_date: todayISO(), demo_time: "", weeks: 8, current_week: 1, category: defaultCategory || "JMS", project_type: defaultNaavyaType || "SOFTWARE" });
   const [teamIds, setTeamIds] = useState([]);
   const [leaderIds, setLeaderIds] = useState([]);
   const [docText, setDocText] = useState(""); const [pdf, setPdf] = useState(null);
@@ -866,19 +938,22 @@ function NewProject({ onDone }) {
   };
 
   const save = async () => {
-    if (!architectureId) return setErr("Architecture must be approved first.");
+    if (form.category === "JMS" && !architectureId) return setErr("Architecture must be approved first.");
     try {
       const fd = new FormData();
       fd.append("name", form.name);
       if (form.client) fd.append("client", form.client);
       fd.append("start_date", form.start_date);
+      if (form.category === "DEMO" && form.demo_time) fd.append("demo_time", `${form.start_date}T${form.demo_time}`);
       fd.append("weeks", form.weeks);
       fd.append("current_week", form.current_week);
+      fd.append("category", form.category);
+      fd.append("project_type", form.project_type);
       fd.append("team", teamIds.join(","));
       if (leaderIds.length) fd.append("team_leaders", leaderIds.join(","));
-      fd.append("brief", JSON.stringify(draft.brief || {}));
-      fd.append("rows", JSON.stringify(draft.rows || []));
-      fd.append("architecture_id", architectureId);
+      fd.append("brief", JSON.stringify(draft?.brief || {}));
+      fd.append("rows", JSON.stringify(draft?.rows || []));
+      if (architectureId) fd.append("architecture_id", architectureId);
       if (pdf) fd.append("sow_pdf", pdf);
 
       const p = await api.createProject(fd);
@@ -999,9 +1074,33 @@ function NewProject({ onDone }) {
 
   return (
     <Card className="p-6 max-w-2xl">
-      <h2 className="f-disp font-bold text-lg mb-1">New Project — Two Stage Gated Workflow</h2>
-      <p className="text-xs text-gray-500 mb-5">1. Generate &amp; approve architecture from SOW/FDD. 2. Generate aligned plan. Hard gate enforced.</p>
-      <div className="space-y-4">
+      <h2 className="f-disp font-bold text-lg mb-1">New Project</h2>
+      <div className="space-y-4 mt-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Category</Label>
+            <select value={form.category} onChange={e => {
+              const cat = e.target.value;
+              setForm({ ...form, category: cat, project_type: cat === "NAAVYA" ? "VOICE" : "SOFTWARE", weeks: cat === "NAAVYA" ? 2 : 8 });
+            }}
+              className="f-body w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm bg-white">
+              <option value="JMS">JMS Projects</option>
+              <option value="NAAVYA">Naavya AI</option>
+              <option value="DEMO">Demo</option>
+            </select>
+          </div>
+          {form.category === "NAAVYA" && (
+            <div>
+              <Label>Naavya Type</Label>
+              <select value={form.project_type} onChange={e => setForm({ ...form, project_type: e.target.value, weeks: 2 })}
+                className="f-body w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm bg-white">
+                <option value="VOICE">Voice Only</option>
+                <option value="VOICE_WHATSAPP">Voice + WhatsApp</option>
+                <option value="WHATSAPP">WhatsApp Only</option>
+              </select>
+            </div>
+          )}
+        </div>
         <div><Label>Project name</Label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Knowcraft LMS" /></div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -1043,12 +1142,23 @@ function NewProject({ onDone }) {
               </div>
             )}
           </div>
-          <div><Label>SOW ref (optional)</Label><Input value={form.ref} onChange={e => setForm({ ...form, ref: e.target.value })} placeholder="JMS-AGR-2026-0xx" /></div>
+          {form.category !== "DEMO" && (
+            <div><Label>SOW ref (optional)</Label><Input value={form.ref} onChange={e => setForm({ ...form, ref: e.target.value })} placeholder="JMS-AGR-2026-0xx" /></div>
+          )}
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <div><Label>Start date</Label><Input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} /></div>
-          <div><Label>Duration (weeks)</Label><Input type="number" min={1} max={16} value={form.weeks} onChange={e => setForm({ ...form, weeks: parseInt(e.target.value) || 1, current_week: Math.min(form.current_week, parseInt(e.target.value) || 1) })} /></div>
-          <div><Label>Current Week</Label><Input type="number" min={1} max={form.weeks} value={form.current_week} onChange={e => setForm({ ...form, current_week: parseInt(e.target.value) || 1 })} title="Tasks from previous weeks will be auto-completed" /></div>
+          <div><Label>{form.category === "DEMO" ? "Demo Date" : "Start date"}</Label><Input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} /></div>
+          
+          {form.category === "DEMO" && (
+            <div><Label>Demo Time</Label><Input type="time" value={form.demo_time} onChange={e => setForm({ ...form, demo_time: e.target.value })} /></div>
+          )}
+
+          {form.category !== "DEMO" && (
+            <>
+              <div><Label>Duration (weeks)</Label><Input type="number" min={1} max={16} value={form.weeks} onChange={e => setForm({ ...form, weeks: parseInt(e.target.value) || 1, current_week: Math.min(form.current_week, parseInt(e.target.value) || 1) })} /></div>
+              <div><Label>Current Week</Label><Input type="number" min={1} max={form.weeks} value={form.current_week} onChange={e => setForm({ ...form, current_week: parseInt(e.target.value) || 1 })} title="Tasks from previous weeks will be auto-completed" /></div>
+            </>
+          )}
         </div>
         <div>
           <Label>Team on this project</Label>
@@ -1104,11 +1214,17 @@ function NewProject({ onDone }) {
             className="f-body w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-200" />
         </div>
         {err && <p className="text-sm text-red-600 flex items-center gap-1.5"><AlertTriangle size={14} /> {err}</p>}
-        <div className="flex gap-2">
-          <Btn onClick={generateArchitecture}><Sparkles size={15} /> Generate Architecture (Step 1)</Btn>
+        <div className="flex gap-2 pt-2 border-t mt-4">
+          {form.category === "JMS" ? (
+            <Btn onClick={generateArchitecture}><Sparkles size={15} /> Generate Architecture (Step 1)</Btn>
+          ) : (
+            <Btn onClick={save}><CheckCircle2 size={15} /> Create Project</Btn>
+          )}
           <Btn kind="ghost" onClick={() => onDone(null)}>Cancel</Btn>
         </div>
-        <div className="text-[10px] text-amber-600 pt-2 border-t">Backend now enforces approved architecture before plan or project creation.</div>
+        {form.category === "JMS" && (
+          <div className="text-[10px] text-amber-600 pt-1">Backend enforces approved architecture before plan or project creation for JMS projects.</div>
+        )}
       </div>
     </Card>
   );
@@ -2215,7 +2331,7 @@ function UpdateModal({ onClose, onPost }) {
 }
 
 /* ================= DEVELOPER ================= */
-function DevShell({ me, signOut }) {
+function DevShell({ me, signOut, category, naavyaType, onBack }) {
   const [tasks, setTasks] = useState(null);
   const [projects, setProjects] = useState([]);
   const [tab, setTab] = useState("today");
@@ -2224,7 +2340,9 @@ function DevShell({ me, signOut }) {
   const [viewHistory, setViewHistory] = useState(null);
 
   const load = async () => {
-    const [t, p] = await Promise.all([api.tasks("?mine=1&no_page=1"), api.projects("?no_page=1")]);
+    let q = `?no_page=1&category=${category}`;
+    if (category === "NAAVYA" && naavyaType) q += `&project_type=${naavyaType}`;
+    const [t, p] = await Promise.all([api.tasks(`?mine=1${q}`), api.projects(q)]);
     setTasks(t.results || t); setProjects(p.results || p);
   };
   useEffect(() => { load(); }, []);
@@ -2242,6 +2360,8 @@ function DevShell({ me, signOut }) {
   const overdue = tasks.filter(t => t.date < today && t.status !== "DONE");
   const upcoming = tasks.filter(t => t.date > today).slice(0, 15);
 
+  const workspaceLabel = category === "JMS" ? "JMS Projects" : category === "NAAVYA" ? `Naavya AI (${naavyaType === "VOICE_WHATSAPP" ? "Voice + WhatsApp" : naavyaType === "WHATSAPP" ? "WhatsApp Only" : "Voice Only"})` : "Demo";
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
       <header className="flex items-center justify-between mb-5">
@@ -2251,8 +2371,13 @@ function DevShell({ me, signOut }) {
             <h1 className="f-disp text-lg font-bold leading-tight" style={{ color: INK }}>{me.name}</h1>
             <p className="text-xs text-gray-500 leading-none mt-0.5">{me.designation || "Developer"} · {fmtLong(today)}</p>
           </div>
+          <div className="ml-3 pl-3 border-l border-gray-300">
+            <div className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Workspace</div>
+            <div className="f-disp text-xs font-bold text-gray-700">{workspaceLabel}</div>
+          </div>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={onBack} className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold inline-flex items-center gap-1"><RefreshCw size={12} /> Switch</button>
           <button onClick={load} className="text-gray-400 hover:text-gray-700" title="Refresh"><RefreshCw size={15} /></button>
           <button onClick={signOut} className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1"><LogOut size={13} /> Sign out</button>
         </div>

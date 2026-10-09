@@ -39,7 +39,11 @@ export const api = {
   addClient: (c) => request("/clients/", { method: "POST", body: c }),
   delClient: (id) => request(`/clients/${id}/`, { method: "DELETE" }),
 
-  dashboard: () => request("/dashboard/"),
+  dashboard: (category, naavyaType) => {
+    let url = `/dashboard/?category=${category || "JMS"}`;
+    if (category === "NAAVYA") url += `&project_type=${naavyaType || "VOICE"}`;
+    return request(url);
+  },
 
   projects: (params = "") => request(params.startsWith("http") ? params : `/projects/${params}`),
   project: (id) => request(`/projects/${id}/`),
