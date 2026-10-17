@@ -45,7 +45,17 @@ export const api = {
     return request(url);
   },
 
-  projects: (params = "") => request(params.startsWith("http") ? params : `/projects/${params}`),
+  projects: (params = "") => {
+    if (typeof params === "string") {
+      return request(params.startsWith("http") ? params : `/projects/${params}`);
+    }
+    const sp = new URLSearchParams();
+    Object.entries(params || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "") sp.append(k, v);
+    });
+    const qs = sp.toString();
+    return request(`/projects/${qs ? `?${qs}` : ""}`);
+  },
   project: (id) => request(`/projects/${id}/`),
   generatePlan: (formData) => request("/projects/generate-plan/", { method: "POST", body: formData, form: true }),
   createProject: (formData) => request("/projects/", { method: "POST", body: formData, form: true }),

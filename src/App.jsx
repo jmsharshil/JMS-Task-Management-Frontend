@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Users, Briefcase, FolderKanban, LayoutDashboard, Plus, Trash2, ChevronRight, ChevronDown, CheckCircle2, Circle, FileText, Loader2, Mail, Copy, Download, ArrowLeft, RefreshCw, LogOut, X, AlertTriangle, Sparkles, BarChart3, Megaphone, SlidersHorizontal, Bot, MessageSquare, Paperclip, UploadCloud, Eye, Pencil, Link2, Settings, Target } from "lucide-react";
+import { Users, Briefcase, FolderKanban, LayoutDashboard, Plus, Trash2, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight, ChevronDown, CheckCircle2, Circle, FileText, Loader2, Mail, Copy, Download, ArrowLeft, RefreshCw, LogOut, X, AlertTriangle, Sparkles, BarChart3, Megaphone, SlidersHorizontal, Bot, MessageSquare, Paperclip, UploadCloud, Eye, Pencil, Link2, Settings, Target, Search } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend
@@ -53,6 +53,145 @@ const Spinner = ({ text }) => (
     <Loader2 className="animate-spin mx-auto mb-2" size={20} style={{ color: RED }} /> {text}
   </div>
 );
+
+const Pagination = ({
+  page = 1,
+  pageSize = 10,
+  totalCount = 0,
+  onPageChange,
+  onPageSizeChange,
+  pageSizeOptions = [5, 10, 15, 25, 50],
+  loading = false,
+  itemName = "projects",
+}) => {
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const from = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, totalCount);
+
+  const getPageNumbers = () => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (page <= 4) {
+      return [1, 2, 3, 4, 5, "...", totalPages];
+    }
+    if (page >= totalPages - 3) {
+      return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, "...", page - 1, page, page + 1, "...", totalPages];
+  };
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3.5 border-t border-gray-200 mt-4 text-xs select-none">
+      {/* Item range and count */}
+      <div className="flex items-center gap-2 text-gray-500">
+        {loading ? (
+          <Loader2 size={13} className="animate-spin text-red-600" />
+        ) : (
+          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+        )}
+        <span>
+          Showing <strong className="text-gray-900 font-semibold">{from}–{to}</strong> of{" "}
+          <strong className="text-gray-900 font-semibold">{totalCount}</strong> {itemName}
+        </span>
+        {totalPages > 1 && (
+          <span className="text-gray-400 font-medium">· Page {page} of {totalPages}</span>
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-2">
+        {onPageSizeChange && (
+          <div className="flex items-center gap-1.5 mr-1">
+            <span className="text-gray-500">Show:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              disabled={loading}
+              className="f-body border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 font-medium focus:outline-none focus:ring-1 focus:ring-red-400 text-xs cursor-pointer shadow-xs"
+            >
+              {pageSizeOptions.map((sz) => (
+                <option key={sz} value={sz}>{sz} / page</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="inline-flex items-center gap-1">
+          {/* First page */}
+          <button
+            type="button"
+            onClick={() => onPageChange(1)}
+            disabled={page <= 1 || loading}
+            title="First page"
+            className="p-1.5 rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronsLeft size={14} />
+          </button>
+
+          {/* Previous page */}
+          <button
+            type="button"
+            onClick={() => onPageChange(page - 1)}
+            disabled={page <= 1 || loading}
+            title="Previous page"
+            className="px-2 py-1.5 rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-35 disabled:cursor-not-allowed font-medium transition-colors inline-flex items-center gap-1"
+          >
+            <ChevronLeft size={14} />
+            <span className="hidden sm:inline">Prev</span>
+          </button>
+
+          {/* Page numbers */}
+          {getPageNumbers().map((num, idx) =>
+            num === "..." ? (
+              <span key={`ellipsis-${idx}`} className="px-1 text-gray-400 font-bold select-none">
+                …
+              </span>
+            ) : (
+              <button
+                key={`page-${num}`}
+                type="button"
+                onClick={() => onPageChange(num)}
+                disabled={loading}
+                className={`min-w-[28px] h-7 px-2 rounded font-semibold text-xs transition-colors ${
+                  num === page
+                    ? "text-white shadow-sm"
+                    : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
+                }`}
+                style={num === page ? { background: RED } : {}}
+              >
+                {num}
+              </button>
+            )
+          )}
+
+          {/* Next page */}
+          <button
+            type="button"
+            onClick={() => onPageChange(page + 1)}
+            disabled={page >= totalPages || loading}
+            title="Next page"
+            className="px-2 py-1.5 rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-35 disabled:cursor-not-allowed font-medium transition-colors inline-flex items-center gap-1"
+          >
+            <span className="hidden sm:inline">Next</span>
+            <ChevronRight size={14} />
+          </button>
+
+          {/* Last page */}
+          <button
+            type="button"
+            onClick={() => onPageChange(totalPages)}
+            disabled={page >= totalPages || loading}
+            title="Last page"
+            className="p-1.5 rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronsRight size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /* ================= ROOT ================= */
 export default function App() {
@@ -797,46 +936,296 @@ function ClientsTab() {
 function ProjectsTab({ onOpen, category, naavyaType }) {
   const [data, setData] = useState(null);
   const [creating, setCreating] = useState(false);
-  
-  const load = (url = "") => api.projects(url).then(setData);
-  useEffect(() => { load(); }, []);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL"); // ALL | IN_PROGRESS | COMPLETED
+  const [loading, setLoading] = useState(false);
 
-  if (creating) return <NewProject onDone={(p) => { setCreating(false); load(); if (p) onOpen(p.id); }} defaultCategory={category} defaultNaavyaType={naavyaType} />;
-  if (!data) return <Spinner text="Loading projects…" />;
+  // Debounce search query
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [search]);
 
-  const allProjects = data.results || data;
-  let projects = allProjects.filter(p => (p.category || "JMS") === category);
-  if (category === "NAAVYA") {
-    projects = projects.filter(p => p.project_type === naavyaType);
+  // When workspace category or type changes, reset page and search
+  useEffect(() => {
+    setPage(1);
+    setSearch("");
+    setDebouncedSearch("");
+  }, [category, naavyaType]);
+
+  const load = async (targetPage = page, targetPageSize = pageSize, query = debouncedSearch) => {
+    setLoading(true);
+    try {
+      const params = {
+        category,
+        page: targetPage,
+        page_size: targetPageSize,
+      };
+      if (category === "NAAVYA" && naavyaType) {
+        params.project_type = naavyaType;
+      }
+      if (query && query.trim()) {
+        params.search = query.trim();
+      }
+      const res = await api.projects(params);
+      setData(res);
+    } catch (e) {
+      console.error("Failed to load projects:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load(page, pageSize, debouncedSearch);
+  }, [category, naavyaType, page, pageSize, debouncedSearch]);
+
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
+  };
+
+  const handlePageSizeChange = (newSize) => {
+    setPageSize(newSize);
+    setPage(1);
+  };
+
+  if (creating) {
+    return (
+      <NewProject
+        onDone={(p) => {
+          setCreating(false);
+          load(1, pageSize, debouncedSearch);
+          if (p) onOpen(p.id);
+        }}
+        defaultCategory={category}
+        defaultNaavyaType={naavyaType}
+      />
+    );
   }
 
+  const allProjects = Array.isArray(data) ? data : data?.results || [];
+  const totalCount = data?.count ?? allProjects.length;
+
+  // Filter displayed projects by status filter if requested
+  const displayedProjects = allProjects.filter((p) => {
+    if (statusFilter === "COMPLETED") return (p.stats?.pct ?? 0) === 100;
+    if (statusFilter === "IN_PROGRESS") return (p.stats?.pct ?? 0) < 100;
+    return true;
+  });
+
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-        <h2 className="f-disp font-bold text-lg">Projects</h2>
-        <Btn onClick={() => setCreating(true)}><Plus size={15} /> New project</Btn>
+    <div className="space-y-4">
+      {/* Top Header & Action */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h2 className="f-disp font-bold text-xl text-gray-900">Projects</h2>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+              {totalCount} total
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Manage projects, timelines, team allocations, and delivery milestones.
+          </p>
+        </div>
+        <Btn onClick={() => setCreating(true)} className="shadow-xs">
+          <Plus size={15} /> New project
+        </Btn>
       </div>
-      <div className="space-y-2">
-        {projects.map(p => (
-          <Card key={p.id} className="p-4 flex items-center justify-between hover:border-red-300 cursor-pointer" onClick={() => onOpen(p.id)}>
-            <div>
-              <div className="f-disp font-bold">{p.name}</div>
-              <div className="text-xs text-gray-500 mt-0.5">
-                {p.client_name || "—"} · {p.weeks} weeks · starts {fmt(p.start_date)} ·
-                Team: {p.team_detail.map(t => t.name).join(", ")}
-                {p.team_leaders_detail?.length > 0 && ` · Leaders: ${p.team_leaders_detail.map(t => t.name).join(", ")}`}
-                · {p.stats.pct}% done
+
+      {/* Filter and Search Bar */}
+      <div className="bg-white p-3 border border-gray-200 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+        <div className="relative flex-1 max-w-md">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search projects by name, client, or ref..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="f-body w-full pl-9 pr-8 py-2 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-400 transition-all bg-gray-50/50 focus:bg-white"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Status Pills */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-gray-400 font-medium mr-1">Status:</span>
+          {[
+            { id: "ALL", label: "All" },
+            { id: "IN_PROGRESS", label: "In Progress" },
+            { id: "COMPLETED", label: "Completed" },
+          ].map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setStatusFilter(s.id)}
+              className={`text-xs px-2.5 py-1 rounded-md font-medium transition-colors ${
+                statusFilter === s.id
+                  ? "bg-gray-900 text-white shadow-xs"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Projects List Container */}
+      {!data && loading ? (
+        <Spinner text="Loading projects…" />
+      ) : (
+        <div className="relative">
+          {/* Subtle loading overlay when fetching next page */}
+          {loading && (
+            <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-lg">
+              <div className="bg-white px-3 py-1.5 rounded-full shadow-md border border-gray-200 flex items-center gap-2 text-xs font-semibold text-gray-700">
+                <Loader2 size={14} className="animate-spin text-red-600" />
+                Updating projects…
               </div>
             </div>
-            <ChevronRight size={16} className="text-gray-400" />
-          </Card>
-        ))}
-        {projects.length === 0 && <Card className="p-8 text-center text-gray-400 text-sm">No projects yet. Click "New project" to create your first one.</Card>}
-      </div>
-      {(data.next || data.previous) && (
-        <div className="flex items-center justify-between mt-4">
-          <Btn kind="outline" small disabled={!data.previous} onClick={() => load(data.previous)}>Previous</Btn>
-          <Btn kind="outline" small disabled={!data.next} onClick={() => load(data.next)}>Next</Btn>
+          )}
+
+          <div className="space-y-2.5">
+            {displayedProjects.map((p) => {
+              const pct = p.stats?.pct ?? 0;
+              const isDone = pct === 100;
+              return (
+                <Card
+                  key={p.id}
+                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-red-300 hover:shadow-xs transition-all cursor-pointer group"
+                  onClick={() => onOpen(p.id)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="f-disp font-bold text-base text-gray-900 group-hover:text-red-700 transition-colors">
+                        {p.name}
+                      </span>
+                      {p.ref && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">
+                          {p.ref}
+                        </span>
+                      )}
+                      {p.client_name && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                          <Briefcase size={10} />
+                          {p.client_name}
+                        </span>
+                      )}
+                      {isDone ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle2 size={11} /> Completed
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                          {pct}% Done
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-xs text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                      <span>{p.weeks} weeks</span>
+                      <span>·</span>
+                      <span>Starts {fmt(p.start_date)}</span>
+                      {p.team_detail?.length > 0 && (
+                        <>
+                          <span>·</span>
+                          <span className="text-gray-700">
+                            Team: {p.team_detail.map((t) => t.name).join(", ")}
+                          </span>
+                        </>
+                      )}
+                      {p.team_leaders_detail?.length > 0 && (
+                        <>
+                          <span>·</span>
+                          <span className="text-emerald-700 font-medium">
+                            Leaders: {p.team_leaders_detail.map((t) => t.name).join(", ")}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Mini progress line */}
+                    <div className="w-full max-w-xs mt-2.5">
+                      <ProgressBar pct={pct} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 self-end sm:self-center">
+                    <div className="text-right hidden sm:block">
+                      <div className="text-xs font-bold text-gray-700">
+                        {p.stats?.done || 0}/{p.stats?.total || 0}
+                      </div>
+                      <div className="text-[10px] text-gray-400">tasks completed</div>
+                    </div>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-50 group-hover:bg-red-50 text-gray-400 group-hover:text-red-600 transition-colors">
+                      <ChevronRight size={18} />
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+
+            {displayedProjects.length === 0 && (
+              <Card className="p-10 text-center text-gray-400 text-sm">
+                <FolderKanban size={32} className="mx-auto mb-2 text-gray-300" />
+                {debouncedSearch ? (
+                  <>
+                    <p className="font-medium text-gray-600 mb-1">No projects matched your search</p>
+                    <p className="text-xs text-gray-400">Try adjusting keywords or clearing the search bar.</p>
+                    <button
+                      onClick={() => setSearch("")}
+                      className="mt-3 text-xs text-red-600 hover:underline font-semibold"
+                    >
+                      Clear search
+                    </button>
+                  </>
+                ) : statusFilter !== "ALL" ? (
+                  <>
+                    <p className="font-medium text-gray-600 mb-1">No {statusFilter.toLowerCase().replace("_", " ")} projects</p>
+                    <button
+                      onClick={() => setStatusFilter("ALL")}
+                      className="mt-2 text-xs text-red-600 hover:underline font-semibold"
+                    >
+                      Show all projects
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-gray-600 mb-1">No projects found in this workspace</p>
+                    <p className="text-xs text-gray-400 mb-3">Click below to create your first project.</p>
+                    <Btn onClick={() => setCreating(true)} small>
+                      <Plus size={14} /> New project
+                    </Btn>
+                  </>
+                )}
+              </Card>
+            )}
+          </div>
+
+          {/* ALWAYS VISIBLE, BEAUTIFULLY STYLED PAGINATION FOOTER */}
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            totalCount={statusFilter === "ALL" ? totalCount : displayedProjects.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            pageSizeOptions={[5, 10, 15, 25, 50]}
+            loading={loading}
+            itemName="projects"
+          />
         </div>
       )}
     </div>
